@@ -1,4 +1,4 @@
-package MetricCache
+package cacheutil
 import (
   "fmt"
   "testing"
@@ -7,13 +7,13 @@ import (
 )
 
 
-func populateCacheWithHosts(count int ,hostname_prefix string) *Cache {
+func populateCacheWithHosts(count int ,hostname string) *Cache {
   //hostDict:=Cache{}
   var hostDict = NewCache()
   for i:=0;i<count;i++ {
-    hostDict.Put(fmt.Sprintf("%s_%d", hostname_prefix,i))
+    hostDict.Put(fmt.Sprintf("%s_%d", hostname,i))
   }
-  return hostDict
+  return &hostDict
 }
 
 func getLabels(hostname string) Label{
@@ -24,16 +24,15 @@ func getLabels(hostname string) Label{
   return labels
 }
 //get 100's of  metric for each host
-func getPluginsByHostname(hostname string) *Plugins{
-  // initlaize
-  pluginDict:=NewPlugins()
+func setPlugin(hostname string, pluginCache *ShardedPluginCache) {
+  // initlaizepluginsDic:=
   //some common name
   pluginNames :=[]string{"interface","network","cpuutilization","memoryused","memoryfree"}
   // 100 plugin
   var plugins[100]string
 
   // generate 100 difference meteric names
-  var j int=0
+  var j int
   for i:=0;i<20;i++ {
     for _,value:= range pluginNames{
     plugins[j]=fmt.Sprintf("%s_%s_%d", "metric",value,j)
@@ -59,11 +58,9 @@ func getPluginsByHostname(hostname string) *Plugins{
       plugin.datasource.Put(value,rand.Float64())
     }
     //deference pointer befor sending
-    pluginDict.Put(plugin.name,*plugin)
+    pluginCache.Put(plugin.name,*plugin)
 
     }
-
-   return pluginDict
 }
 
 func TestPut(t *testing.T){
@@ -71,30 +68,34 @@ func TestPut(t *testing.T){
   if size := cache.Size(); size != 100 {
         t.Errorf("wrong count of hosts, expected 100 and got %d", size)
     }
-  cache.Put("redhat.bosoton.nfv_99") //should not add a new one, just change the existing one
-  if size := cache.Size(); size != 100 {
-      t.Errorf("wrong count, expected 100 and got %d", size)
-  }
-  cache.Put("redhat.bosoton.nfv_101") //should add it
-  if size := cache.Size(); size != 101 {
-      t.Errorf("wrong count, expected 1plugins01 and got %d", size)
-  }
-  //get  plugin
 
-  for hostname:= range cache.hosts{
-     pluginsDic:=getPluginsByHostname(hostname )
-    if size := pluginsDic.Size(); size != 100 {
-        t.Errorf("wrong count for plugin, expected 10 and got %d", size)
+    cache.Put("redhat.bosoton.nfv_99") //should not add a new one, just change the existing one
+    if size := cache.Size(); size != 100 {
+        t.Errorf("wrong count, expected 100 and got %d", size)
     }
-    cache.hosts[hostname]=pluginsDic
+    cache.Put("redhat.bosoton.nfv_101") //should add it
+    if size := cache.Size(); size != 101 {
+        t.Errorf("wrong count, expected 1plugins01 and got %d", size)
+    }
+    //get  plugin
+
+    for hostname,pluginCache:= range *cache{
+            setPlugin(hostname,pluginCache )
+      if size := pluginCache.Size(); size != 100 {
+          t.Errorf("wrong count for plugin, expected 10 and got %d", size)
+      }
+    }
+    for _,pluginCache := range *cache{
+        if size :=pluginCache.Size(); size != 100 {
+        t.Errorf("wrong count for plugin per hosts, expected 100 and got %d", size)
+    }
   }
-  for hostname := range cache.hosts{
-      if size := cache.hosts[hostname].Size(); size != 100 {
-      t.Errorf("wrong count for plugin per hosts, expected 100 and got %d", size)
-  }
+
+/*
+func TestWriteAndRead(t * testing.T){
+
 }
-
-
+*/
 
 
 
