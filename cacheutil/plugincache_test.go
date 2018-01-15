@@ -48,17 +48,17 @@ func setPlugin(hostname string, pluginCache *ShardedPluginCache) {
   for _, pluginNames:= range plugins{
 
     plugin:=NewPlugin()
-    plugin.metrictype ="guage"
-    plugin.name = pluginNames
+    plugin.Metrictype ="guage"
+    plugin.Name = pluginNames
     labels := getLabels(hostname)
-    for key, value :=range labels.items {
-      plugin.labels.Put(key,value)
+    for key, value :=range labels.Items {
+      plugin.Labels.Put(key,value)
     }
     for _, value := range data {
-      plugin.datasource.Put(value,rand.Float64())
+      plugin.Datasource.Put(value,rand.Float64())
     }
     //deference pointer befor sending
-    pluginCache.Put(plugin.name,*plugin)
+    pluginCache.Put(plugin.Name,*plugin)
 
     }
 }

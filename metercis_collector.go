@@ -44,7 +44,7 @@ var prefetch = flag.Int("prefetch", 0, "enable a pre-fetch window to improve thr
 var debug = flag.Bool("debug", false, "Print detailed debug output")
 var debugf = func(format string, data ...interface{}) {} // Default no debugging output
 
-func main() {
+func main1() {
 	flag.Usage = usage
 	flag.Parse()
 
@@ -124,4 +124,3 @@ func fatalIf(err error) {
 		log.Fatal(err)
 	}
 }
-
