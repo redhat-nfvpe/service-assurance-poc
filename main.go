@@ -4,80 +4,78 @@ import (
 	"fmt"
 	"net/http"
   "time"
-  "math/rand"
+ "math/rand"
   "github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
+
+
 )
+var(
+	lastPush         = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "collectd_last_push_timestamp_seconds",
+				Help: "Unix timestamp of the last received collectd metrics push in seconds.",
+			},
+		)
+)
+
 //meterics  ... can I send cacheutil
 /*func meterics(w http.ResponseWriter, r *http.Request, cache * cacheutil.Cache) {
 	fmt.Fprintf(w, "I got somes metrics for you.. do you like it")
 }*/
+/*
+
+[
+   {
+     "values":  [1901474177],
+     "dstypes":  ["counter"],
+     "dsnames":    ["value"],
+     "time":      1280959128,
+     "interval":          10,
+     "host":            "leeloo.octo.it",
+     "plugin":          "cpu",
+     "plugin_instance": "0",
+     "type":            "cpu",
+     "type_instance":   "idle"
+   }
+ ]*/
+
+ //[{"values":[1],"dstypes":["gauge"],"dsnames":["value"],
+ //"time":1516043586.976,"interval":0.005,"host":"trex","plugin":"sysevent",
+ //"plugin_instance":"","type":"gauge","type_instance":"",
+ //"meta":{"@timestamp":"2018-01-15T19:13:06.971065+00:00","@source_host":"trex",
+ //"@message":"Jan 15 19:13:06 systemd:Starting Dynamic System Tuning Daemon...","facility":"daemon",
+ //"severity":"info","program":"systemd","processid":"-"}}]
+
+//generateCollectdJson   for samples
+func generateCollectdJson(hostname string,pluginname string) string{
+ return `{
+      "values":  [0.0,0.0],
+      "dstypes":  ["gauge","guage"],
+      "dsnames":    ["value1","value2"],
+      "time":      0,
+      "interval":          10,
+      "host":            "hostname",
+      "plugin":          "pluginname",
+      "plugin_instance": "0",
+      "type":            "pluginname",
+      "type_instance":   "idle"
+    }`
+	}
 
 
-/**********************************/
-func populateCacheWithHosts(count int ,hostname string, cache *cacheutil.Cache)  {
-  //hostDict:=Cache{}
 
-  for i:=0;i<count;i++ {
-    cache.Put(fmt.Sprintf("%s_%d", hostname,i))
-  }
-
-}
-func getLabels(hostname string) cacheutil.Label{
-  labels :=cacheutil.Label{}
-  labels.Put("instance",hostname)
-  //labels.Put("id",  strconv.Itoa(id))
-  labels.Put("foo","bar")
-  return labels
-}
-//get 100's of  metric for each host
-func setPlugin(hostname string, pluginCache *cacheutil.ShardedPluginCache) {
-  // initlaizepluginsDic:=
-  //some common name
-  pluginNames :=[]string{"interface","network","cpuutilization","memoryused","memoryfree"}
-  // 100 plugin
-  var plugins[100]string
-
-  // generate 100 difference meteric names
-  var j int
-  for i:=0;i<20;i++ {
-    for _,value:= range pluginNames{
-    plugins[j]=fmt.Sprintf("%s_%s_%d", "metric",value,j)
-    j++
-    }
-  }
-  //data to types for all
-  var data[2]string
-  data[0]="rx"
-  data[1]="tx"
-  //for each host get 100 plugin
-
-  for _, pluginNames:= range plugins{
-
-    plugin:=cacheutil.NewPlugin()
-    plugin.Metrictype ="guage"
-    plugin.Name = pluginNames
-    labels := getLabels(hostname)
-    for key, value :=range labels.Items {
-      plugin.Labels.Put(key,value)
-    }
-    for _, value := range data {
-      plugin.Datasource.Put(value,rand.Float64())
-    }
-    //deference pointer befor sending
-    pluginCache.Put(plugin.Name,*plugin)
-
-    }
-}
 
 /****************************************/
 type inputData struct{
 	host string
 	pluginname string
-	jsondata string
+	collectd cacheutil.Collectd
 }
 
 type CacheServer struct {
-    cache cacheutil.Cache
+    cache cacheutil.PrometehusCollector
 		ch chan inputData
 }
 
@@ -85,7 +83,7 @@ func NewCacheServer() *CacheServer {
 
 		server := &CacheServer{
 		        // make() creates builtins like channels, maps, and slices
-		       cache : cacheutil.NewCache(),
+		       cache : cacheutil.NewPrometehusCollector(),
 					 ch :make(chan inputData),
 		    }
     // Spawn off the server's main loop immediately
@@ -93,9 +91,9 @@ func NewCacheServer() *CacheServer {
     return server
 }
 
-func(s *CacheServer)put(hostname string,pluginname string, jsondata string){
+func(s *CacheServer)Put(hostname string,pluginname string, collectd cacheutil.Collectd){
 	fmt.Println("Putting data")
-	s.ch<-inputData{host:hostname,pluginname:pluginname,jsondata:jsondata}
+	s.ch<-inputData{host:hostname,pluginname:pluginname,collectd:collectd}
 }
 func (s *CacheServer) loop() {
     // The built-in "range" clause can iterate over channels,
@@ -104,10 +102,18 @@ func (s *CacheServer) loop() {
 			select{
 			case data:=<-s.ch:
 				   fmt.Printf("got message %v",data)
+					 // convert this data to prometheus cache
 					 shard:=s.cache.GetShard(data.host)
+					 for i := range data.collectd.Values{
+						 		m, err := cacheutil.NewMetric(data.collectd, i)
+									if err != nil {
+												log.Errorf("newMetric: %v", err)
+												continue
+											}
+								metric_name:=cacheutil.NewName(data.collectd, i)
+								shard.Put(metric_name, m)
+		        }
 
-					 plugin:=shard.GetPluginByName(data.pluginname)
-					 plugin.Add("gauge",data.pluginname,"description")
 
 					 //build the cache
 			//default:
@@ -119,21 +125,39 @@ func (s *CacheServer) loop() {
 
 }
 
+
+
+
+/*************** HTTP HANDLER***********************/
 type cacheHandler struct {
-    cache *cacheutil.Cache
+    cache *cacheutil.PrometehusCollector
 }
 
-func (h *cacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-   for hostname,plugin:= range *h.cache {
+/*func (h *cacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+   for hostname,m:= range *h.cache {
     fmt.Fprintln(w, hostname)
-		for k :=range plugin.Plugins{
+		for k :=range m.GetMetrics(hostname){
 			fmt.Fprintln(w, k)
-
 		}
+	}
 
-   }
-
+}*/
+// Describe implements prometheus.Collector.
+func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
+	ch <- lastPush.Desc()
 }
+// Collect implements prometheus.Collector.
+func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
+	//ch <- lastPush
+	for hostname,m:= range *c.cache {
+	 //fmt.Fprintln(w, hostname)
+	 for _,m :=range m.GetMetrics(hostname){
+		 //fmt.Fprintln(w, k.)
+		 ch <-*m
+	 }
+ }
+}
+
 
 func main() {
   //I just learned this  from here http://www.alexedwards.net/blog/a-recap-of-request-handling
@@ -144,13 +168,28 @@ func main() {
 
   //var caches=make(cacheutil.Cache)
 	var cacheserver=NewCacheServer()
-	//nodeExport := http.NewServeMux()
+	//nodeExport :=for i:=0;i<100;i++ { http.NewServeMux()
   myHandler:=&cacheHandler{cache: &cacheserver.cache}
-	s := &http.Server{
+/*	s := &http.Server{
         Addr:           ":9002",
         Handler:      myHandler  ,
-    }
+    }*/
 
+	prometheus.MustRegister(myHandler)
+	http.Handle("/metrics", prometheus.Handler())
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html>
+             <head><title>Collectd Exporter</title></head>
+             <body>
+             <h1>Collectd Exporter</h1>
+             <p><a href='/metrics'>Metrics</a></p>
+             </body>
+             </html>`))
+	})
+
+
+	//prometheus.MustRegister(myHandler)
+	//s.Handle(*metricsPath, prometheus.Handler())
 
 	//nodeExport.HandleFunc("/meterics", meterics(&cache))
   /***** use channel to pass the variable?????
@@ -164,7 +203,8 @@ func main() {
 
 //  populateCacheWithHosts(100,"redhat.bosoton.nfv",&caches)
 	go func() {
-		s.ListenAndServe()
+		//http.ListenAndServe()
+		log.Fatal(http.ListenAndServe(":8081", nil))
 	}()
 
   for {
@@ -172,15 +212,41 @@ func main() {
     /*for hostname,pluginCache:= range caches{
             setPlugin(hostname,pluginCache )
     }*/
-		for i:=0;i<100;i++ {
-			cacheserver.put(fmt.Sprintf("%s_%d", "redhat.bosoton.nfv",i),
-										fmt.Sprintf("%s_%d", "plugin_name",i),"jsondata")
+		for i:=0;i<1000;i++ {
+       //100o hosts
+			 for j:=0;j<100;j++{
+				 //100 plugins
 
-		}
+				 var incoming_json=generateCollectdJson("hostname","pluginname")
+				 var c =cacheutil.Collectd{}
+				 cacheutil.ParseCollectdJson(&c,incoming_json)
 
-		   time.Sleep(time.Second * 1)
+				 // i have struct now filled with json data
+				 //convert this to prometheus format????
+				 var hostname=fmt.Sprintf("%s_%d", "redhat.bosoton.nfv",i)
+				 var pluginname =fmt.Sprintf("%s_%d", "plugin_name",j)
+         c.Host = hostname
+				 c.Plugin=pluginname
+				 //to do I need to implment my own unmarshaller for this to work
+				 c.Dstypes[0]="gauge"
+				 c.Dstypes[1]="gauge"
 
-  }
+
+         c.Dsnames[0]="value1"
+				 c.Dsnames[1]= "value2"
+
+				 c.Values[0]=rand.Float64()
+				 c.Values[1]=rand.Float64()
+
+         c.Time= (time.Now().UnixNano())/1000000
+				 fmt.Printf("incoming json %s\n",incoming_json)
+				 fmt.Printf("%v\n",c)
+
+				 cacheserver.Put(hostname,pluginname,c)
+			 }
+    }
+		 time.Sleep(time.Second * 1)
+	}
 
 
 }
