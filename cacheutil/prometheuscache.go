@@ -1,132 +1,125 @@
 package cacheutil
 
 import (
-    "sync"
-    "github.com/prometheus/client_golang/prometheus"
-    "strconv"
-    "encoding/json"
-    "regexp"
-    "fmt"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strconv"
+	"sync"
 
-
-
+	"github.com/prometheus/client_golang/prometheus"
 )
-var(
-		metric_name_re = regexp.MustCompile("[^a-zA-Z0-9_:]")
+
+var (
+	metric_name_re = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
 
 type PrometehusCollector map[string]*ShardedPrometehusCollector
 
-
 /*ShardedPluginCache  ,sub types with plugin name fo host has values
 ShardedPluginCache,   map[plugin_name] values are pointer to plugin*/
 type ShardedPrometehusCollector struct {
-  metric map[string]*prometheus.Metric
-  lock  *sync.RWMutex
+	metric map[string]*prometheus.Metric
+	lock   *sync.RWMutex
 }
 
 type Collectd struct {
- Values          []float64
- Dstypes         []string
- Dsnames         []string
- Time		         int64
- Interval        int
- Host            string
- Plugin          string
- Plugin_instance string
- Type           string `json:"type"`
- Type_instance   string
-
+	Values          []float64
+	Dstypes         []string
+	Dsnames         []string
+	Time            int64
+	Interval        int
+	Host            string
+	Plugin          string
+	Plugin_instance string
+	Type            string `json:"type"`
+	Type_instance   string
 }
+
 //NewCache   ...
 func NewPrometehusCollector() PrometehusCollector {
-  return make(PrometehusCollector)
+	return make(PrometehusCollector)
 }
+
 //NewShardedPluginCache  . create new  sharded BufferCache
 func NewShardedPrometehusCollector() *ShardedPrometehusCollector {
-  return &ShardedPrometehusCollector{
-      metric: make(map[string]*prometheus.Metric),
-      lock: new(sync.RWMutex),
-    }
+	return &ShardedPrometehusCollector{
+		metric: make(map[string]*prometheus.Metric),
+		lock:   new(sync.RWMutex),
+	}
 }
-
-
 
 //Put   ..
 func (c PrometehusCollector) Put(hostname string) (shard *ShardedPrometehusCollector) {
-    return c.SetShard(hostname)
+	return c.SetShard(hostname)
 }
+
 //Get ...
 func (c *PrometehusCollector) Get(hostname string) (shard *ShardedPrometehusCollector) {
-    return c.GetShard(hostname)
+	return c.GetShard(hostname)
 }
 func (shard *ShardedPrometehusCollector) GetMetrics(hostname string) (metrics map[string]*prometheus.Metric) {
-   shard.lock.Lock()
-   defer shard.lock.Unlock()
-  return shard.metric
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+	return shard.metric
 }
 
 //SetShard   ...
 func (c PrometehusCollector) SetShard(hostname string) (shard *ShardedPrometehusCollector) {
-     shard=c[hostname]
-     if shard == nil{
-       c[hostname]=NewShardedPrometehusCollector()
-       shard=c[hostname]
-    }
+	shard = c[hostname]
+	if shard == nil {
+		c[hostname] = NewShardedPrometehusCollector()
+		shard = c[hostname]
+	}
 
-    return shard
+	return shard
 }
 
 //GetShard .... add shard
 func (c PrometehusCollector) GetShard(hostname string) (shard *ShardedPrometehusCollector) {
-     shard=c[hostname]
-     if shard == nil{
-       return c.SetShard(hostname)
-    }
-    return shard
+	shard = c[hostname]
+	if shard == nil {
+		return c.SetShard(hostname)
+	}
+	return shard
 }
-
-
-
 
 // Put item with value v and key k into the hashtable
 // key is metric name and values are of type Metric
 func (shard *ShardedPrometehusCollector) Put(pluginname string, metric prometheus.Metric) {
-   shard.lock.Lock()
-   defer shard.lock.Unlock()
-   if shard.metric == nil {
-        shard.metric = make(map[string]*prometheus.Metric)
-    }
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+	if shard.metric == nil {
+		shard.metric = make(map[string]*prometheus.Metric)
+	}
 
-    shard.metric[pluginname]=&metric
-
-}
-func (shard ShardedPrometehusCollector) Get(pluginname string)( prometheus.Metric) {
-   shard.lock.Lock()
-   defer shard.lock.Unlock()
-   if shard.metric == nil {
-        shard.metric =  make(map[string]*prometheus.Metric)
-    }
-
-    return *shard.metric[pluginname]
+	shard.metric[pluginname] = &metric
 
 }
+func (shard ShardedPrometehusCollector) Get(pluginname string) prometheus.Metric {
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+	if shard.metric == nil {
+		shard.metric = make(map[string]*prometheus.Metric)
+	}
 
+	return *shard.metric[pluginname]
 
-
+}
 
 // Size returns the number of the hashtable elements
 func (c PrometehusCollector) Size() int {
-    return len(c)
-}
-// Size  .
-func (shard *ShardedPrometehusCollector) Size() int {
-    shard.lock.RLock()
-    defer shard.lock.RUnlock()
-    return len(shard.metric)
+	return len(c)
 }
 
-func  ParseCollectdJson(c *Collectd ,collectdJson string) {
+// Size  .
+func (shard *ShardedPrometehusCollector) Size() int {
+	shard.lock.RLock()
+	defer shard.lock.RUnlock()
+	return len(shard.metric)
+}
+
+func ParseCollectdJson(c *Collectd, collectdJson string) {
 	var jsonBlob = []byte(collectdJson)
 	err := json.Unmarshal(jsonBlob, c)
 	if err != nil {
@@ -159,8 +152,8 @@ func NewName(vl Collectd, index int) string {
 	}
 
 	switch vl.Dstypes[index] {
-	case "counter","derive" :
-			name += "_total"
+	case "counter", "derive":
+		name += "_total"
 	}
 
 	return metric_name_re.ReplaceAllString(name, "_")
@@ -198,18 +191,18 @@ func NewMetric(vl Collectd, index int) (prometheus.Metric, error) {
 	var valueType prometheus.ValueType
 
 	//switch v := vl.Values[index].(type) {
-  switch vl.Dstypes[index] {
-    case "gauge":
-    		value = float64(vl.Values[index])
-    		valueType = prometheus.GaugeValue
-    case "derive":
-    		value = float64(vl.Values[index])
-    		valueType = prometheus.CounterValue
-    case "counter":
-    		value = float64(vl.Values[index])
-    		valueType = prometheus.CounterValue
-    default:
-    		return nil, fmt.Errorf("unknown value type: %s", vl.Dstypes[index])
+	switch vl.Dstypes[index] {
+	case "gauge":
+		value = float64(vl.Values[index])
+		valueType = prometheus.GaugeValue
+	case "derive":
+		value = float64(vl.Values[index])
+		valueType = prometheus.CounterValue
+	case "counter":
+		value = float64(vl.Values[index])
+		valueType = prometheus.CounterValue
+	default:
+		return nil, fmt.Errorf("unknown value type: %s", vl.Dstypes[index])
 	}
 
 	return prometheus.NewConstMetric(newDesc(vl, index), valueType, value)
