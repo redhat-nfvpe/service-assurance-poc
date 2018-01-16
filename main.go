@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	lastPush = prometheus.NewGauge(
+	lastpulltime int64
+	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "collectd_last_push_timestamp_seconds",
-			Help: "Unix timestamp of the last received collectd metrics push in seconds.",
+			Name: "collectd_last_pull_timestamp_seconds",
+			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
 		},
 	)
 )
@@ -178,15 +179,17 @@ func (s *CacheServer) Put(collectd cacheutil.Collectd) {
 	s.ch <- inputData{collectd: collectd}
 
 }
-func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
+func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric,lasttime int64) {
 	for _, collectd := range shard.plugin {
 		for i := range collectd.Values {
-			m, err := cacheutil.NewMetric(*collectd, i)
-			if err != nil {
-				log.Errorf("newMetric: %v", err)
-				continue
+			if collectd.Time>lasttime{
+				m, err := cacheutil.NewMetric(*collectd, i)
+				if err != nil {
+					log.Errorf("newMetric: %v", err)
+					continue
+				}
+				ch <- m
 			}
-			ch <- m
 		}
 	}
 }
@@ -225,16 +228,18 @@ type cacheHandler struct {
 }*/
 // Describe implements prometheus.Collector.
 func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
-	ch <- lastPush.Desc()
+	ch <- lastPull.Desc()
 }
 
 // Collect implements prometheus.Collector.
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
-	//ch <- lastPush
+	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
+	ch <- lastPull
+	var previouspullTime=lastpulltime
+	lastpulltime=int64(time.Now().UnixNano()) / 1e9
 	for _, plugin := range c.cache.hosts {
 		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
-
+		plugin.GetNewMetric(ch,previouspullTime)
 	}
 }
 
@@ -290,34 +295,49 @@ func main() {
 		/*for hostname,pluginCache:= range caches{
 		        setPlugin(hostname,pluginCache )
 		}*/
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 2; i++ {
 			//100o hosts
-			for j := 0; j < 100; j++ {
-				//100 plugins
-				var incoming_json = generateCollectdJson("hostname", "pluginname")
-				var c = cacheutil.Collectd{}
-				cacheutil.ParseCollectdJson(&c, incoming_json)
-				// i have struct now filled with json data
-				//convert this to prometheus format????
+			//pluginChannel := make(chan cacheutil.Collectd)
+			var jsondata = generateCollectdJson("hostname", "pluginname")
+			//for each host make it on go routine
+			go func() {
 				var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", i)
-				var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
-				c.Host = hostname
-				c.Plugin = pluginname
-				//to do I need to implment my own unmarshaller for this to work
-				c.Dstypes[0] = "gauge"
-				c.Dstypes[1] = "gauge"
-				c.Dsnames[0] = "value1"
-				c.Dsnames[1] = "value2"
-				c.Values[0] = rand.Float64()
-				c.Values[1] = rand.Float64()
-				c.Time = (time.Now().UnixNano()) / 1000000
-				fmt.Printf("incoming json %s\n", incoming_json)
-				fmt.Printf("%v\n", c)
+				gentestdata(hostname, 100, jsondata, cacheserver)
+			   //collectdPluginData := <-pluginChannel
+   			 //cacheserver.Put(collectdPluginData)
+			}()
 
-				cacheserver.Put(c)
-			}
 		}
 		time.Sleep(time.Second * 1)
 	}
 
+}
+
+func gentestdata(hostname string, plugincount int, collectdjson string, cacheserver *CacheServer) {
+	//100 plugins
+	for j := 0; j < plugincount; j++ {
+		var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
+		fmt.Printf("index value is ****%d\n",j)
+		fmt.Printf("Plugin_name%s\n",pluginname)
+		var c = cacheutil.Collectd{}
+		cacheutil.ParseCollectdJson(&c, collectdjson)
+		// i have struct now filled with json data
+		//convert this to prometheus format????
+
+		c.Host = hostname
+		c.Plugin = pluginname
+		c.Type = pluginname
+		c.Plugin_instance = pluginname
+		//to do I need to implment my own unmarshaller for this to work
+		c.Dstypes[0] = "gauge"
+		c.Dstypes[1] = "gauge"
+		c.Dsnames[0] = "value1"
+		c.Dsnames[1] = "value2"
+		c.Values[0] = rand.Float64()
+		c.Values[1] = rand.Float64()
+		c.Time = (time.Now().UnixNano()) / 1000000
+		fmt.Printf("incoming json %s\n", collectdjson)
+		fmt.Printf("%v\n", c)
+		cacheserver.Put(c)
+	}
 }
