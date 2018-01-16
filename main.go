@@ -300,6 +300,10 @@ func main() {
 	/*go func(){
 		amqp.AMQP()
 	}()*/
+	//foramqp
+	//messages := make(chan amqp.Message) // Channel for messages from goroutines to main()
+	//defer close(messages)
+
 
 	for {
 		//sleep for 2 secs
