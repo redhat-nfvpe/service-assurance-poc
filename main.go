@@ -20,7 +20,7 @@ var (
 		},
 	)
 )
-
+var freeList = make(chan *inputData, 100)
 //meterics  ... can I send cacheutil
 /*func meterics(w http.ResponseWriter, r *http.Request, cache * cacheutil.Cache) {
 	fmt.Fprintf(w, "I got somes metrics for you.. do you like it")
@@ -147,7 +147,7 @@ func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
 
 type CacheServer struct {
 	cache InputDataV2
-	ch  chan inputData
+	ch  chan *inputData
 }
 
 func NewCacheServer() *CacheServer {
@@ -156,7 +156,7 @@ func NewCacheServer() *CacheServer {
 		// make() creates builtins like channels, maps, and slices
 		//cache: cacheutil.NewPrometehusCollector(),
 		cache: NewInputDataV2(),
-		ch:  make(chan inputData,2),
+		ch:  make(chan *inputData),
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
@@ -166,7 +166,7 @@ func NewCacheServer() *CacheServer {
 func (s *CacheServer) Put(collectd cacheutil.Collectd) {
 	//fmt.Println("Putting data")
 	//s.ch <- inputData{host: hostname, pluginname: pluginname, collectd: collectd}
-	s.ch <- inputData{collectd: collectd}
+	s.ch <- &inputData{collectd: collectd}
 
 }
 // GetNewMetric
@@ -196,13 +196,23 @@ func (s *CacheServer) loop() {
 	// The built-in "range" clause can iterate over channels,
 	// amongst other things
 	for {
-		select {
+		data := <-s.ch
+		shard := s.cache.GetShard(data.collectd.Host)
+		shard.SetCollectD(data.collectd)
+		// Reuse buffer if there's room.
+    select {
+        case freeList <- data:
+            // Buffer on free list; nothing more to do.
+        default:
+            // Free list full, just carry on.
+        }
+		/*select {
 		case data := <-s.ch:
 			//fmt.Printf("got message in channel %v", data)
 			shard := s.cache.GetShard(data.collectd.Host)
 			shard.SetCollectD(data.collectd)
 
-		}
+		}*/
 	}
 
 	// Handle the command
@@ -246,6 +256,7 @@ func main() {
 	   Processing HTTP requests with Go is primarily abo*testing.T)ut two things: ServeMuxes and Handlers.
 	   The http.ServeMux is itself an http.Handler, so it can be passed into http.ListenAndServe.
 	*/
+
 
 	//var caches=make(cacheutil.Cache)
 	var cacheserver = NewCacheServer()
@@ -295,13 +306,13 @@ func main() {
 		/*for hostname,pluginCache:= range caches{
 		        setPlugin(hostname,pluginCache )
 		}*/
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 1000; i++ {
 			//100o hosts
 			//pluginChannel := make(chan cacheutil.Collectd)
 			var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
 			//for each host make it on go routine
 			var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", i)
-			gentestdata(hostname, 1, jsondata, cacheserver)
+			gentestdata(hostname, 100, jsondata, cacheserver)
 
 		}
 		/*for _,shard :=range cacheserver.cache.hosts{
