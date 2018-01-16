@@ -1,10 +1,9 @@
 package cacheutil
 
 import (
-	"encoding/json"
+
 	"fmt"
 	"regexp"
-	"strconv"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,18 +22,7 @@ type ShardedPrometehusCollector struct {
 	lock   *sync.RWMutex
 }
 
-type Collectd struct {
-	Values          []float64
-	Dstypes         []string
-	Dsnames         []string
-	Time            int64
-	Interval        int
-	Host            string
-	Plugin          string
-	Plugin_instance string
-	Type            string `json:"type"`
-	Type_instance   string
-}
+
 
 //NewCache   ...
 func NewPrometehusCollector() PrometehusCollector {
@@ -119,25 +107,7 @@ func (shard *ShardedPrometehusCollector) Size() int {
 	return len(shard.metric)
 }
 
-func ParseCollectdJson(c *Collectd, collectdJson string) {
-	var jsonBlob = []byte(collectdJson)
-	err := json.Unmarshal(jsonBlob, c)
-	if err != nil {
-		fmt.Println("error:", err)
-	}
 
-}
-
-// newName converts one data source of a value list to a string representation.
-func (vl *Collectd) DSName(index int) string {
-	if vl.Dsnames != nil {
-		return vl.Dsnames[index]
-	} else if len(vl.Values) != 1 {
-		return strconv.FormatInt(int64(index), 10)
-	}
-
-	return "value"
-}
 
 func NewName(vl Collectd, index int) string {
 	var name string
@@ -179,8 +149,8 @@ func newLabels(vl Collectd) prometheus.Labels {
 
 //newDesc converts one data source of a value list to a Prometheus description.
 func newDesc(vl Collectd, index int) *prometheus.Desc {
-	help := fmt.Sprintf("Collectd exporter: '%s' Type: '%s' Dstype: '%T' Dsname: '%s'",
-		vl.Plugin, vl.Type, vl.Values[index], vl.DSName(index))
+	help := fmt.Sprintf("Collectd exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
+		vl.Plugin, vl.Type, vl.Dstypes[index], vl.DSName(index))
 
 	return prometheus.NewDesc(NewName(vl, index), help, []string{}, newLabels(vl))
 }
@@ -202,7 +172,7 @@ func NewMetric(vl Collectd, index int) (prometheus.Metric, error) {
 		value = float64(vl.Values[index])
 		valueType = prometheus.CounterValue
 	default:
-		return nil, fmt.Errorf("unknown value type: %s", vl.Dstypes[index])
+		return nil, fmt.Errorf("unknowdsnamen value type: %s", vl.Dstypes[index])
 	}
 
 	return prometheus.NewConstMetric(newDesc(vl, index), valueType, value)

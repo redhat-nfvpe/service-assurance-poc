@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	//"github.com/aneeshkp/service-assurance-goclient/amqp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"math/rand"
@@ -12,8 +13,7 @@ import (
 )
 
 var (
-	lastpulltime int64
-	lastPull = prometheus.NewGauge(
+		lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "collectd_last_pull_timestamp_seconds",
 			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
@@ -49,21 +49,7 @@ var (
 //"@message":"Jan 15 19:13:06 systemd:Starting Dynamic System Tuning Daemon...","facility":"daemon",
 //"severity":"info","program":"systemd","processid":"-"}}]
 
-//generateCollectdJson   for samples
-func generateCollectdJson(hostname string, pluginname string) string {
-	return `{
-      "values":  [0.0,0.0],
-      "dstypes":  ["gauge","guage"],
-      "dsnames":    ["value1","value2"],
-      "time":      0,
-      "interval":          10,
-      "host":            "hostname",
-      "plugin":          "pluginname",
-      "plugin_instance": "0",
-      "type":            "pluginname",
-      "type_instance":   "idle"
-    }`
-}
+
 
 /****************************************/
 //this is inutdata send to cache server
@@ -104,22 +90,26 @@ func (i InputDataV2) Put(hostname string) {
 	i.hosts[hostname] = NewShardedInputDataV2()
 	//mutex.UnLock()
 }
+//GetShard  ..
 func (i InputDataV2) GetShard(hostname string) *ShardedInputDataV2 {
 	//GetShard .... add shard
+	//i.lock.Lock()
 	var shard = i.hosts[hostname]
-	fmt.Println(shard)
 	if shard == nil {
-		fmt.Println("Shard is empty")
+		fmt.Printf("Shard is empty for %s\n",hostname)
 		i.Put(hostname)
-		fmt.Println(i.hosts[hostname])
 	}
+	//i.lock.Unlock()
 	return i.hosts[hostname]
 }
+//GetCollectD   ..
 func (shard *ShardedInputDataV2) GetCollectD(pluginname string) cacheutil.Collectd {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	return *shard.plugin[pluginname]
 }
+
+
 
 func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
 	shard.lock.Lock()
@@ -150,14 +140,14 @@ func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
 		if shard.plugin[collectd.Plugin].Type_instance != collectd.Type_instance {
 			shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
 		}
-
+    shard.plugin[collectd.Plugin].SetNew(true)
 	}
 
 }
 
 type CacheServer struct {
 	cache InputDataV2
-	ch    chan inputData
+	ch  chan inputData
 }
 
 func NewCacheServer() *CacheServer {
@@ -166,7 +156,7 @@ func NewCacheServer() *CacheServer {
 		// make() creates builtins like channels, maps, and slices
 		//cache: cacheutil.NewPrometehusCollector(),
 		cache: NewInputDataV2(),
-		ch:    make(chan inputData),
+		ch:  make(chan inputData,2),
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
@@ -174,23 +164,32 @@ func NewCacheServer() *CacheServer {
 }
 
 func (s *CacheServer) Put(collectd cacheutil.Collectd) {
-	fmt.Println("Putting data")
+	//fmt.Println("Putting data")
 	//s.ch <- inputData{host: hostname, pluginname: pluginname, collectd: collectd}
 	s.ch <- inputData{collectd: collectd}
 
 }
-func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric,lasttime int64) {
+// GetNewMetric
+func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
 	for _, collectd := range shard.plugin {
-		for i := range collectd.Values {
-			if collectd.Time>lasttime{
-				m, err := cacheutil.NewMetric(*collectd, i)
-				if err != nil {
-					log.Errorf("newMetric: %v", err)
-					continue
-				}
-				ch <- m
+		if collectd.ISNew(){
+			collectd.SetNew(false)
+			for i := range collectd.Values {
+				//fmt.Printf("Before new metric %v\n", collectd)
+					m, err := cacheutil.NewMetric(*collectd, i)
+					if err != nil {
+						log.Errorf("newMetric: %v", err)
+						continue
+					}
+
+					ch <- m
 			}
-		}
+
+		}//else{
+		//	fmt.Println("old data")
+		//}
 	}
 }
 func (s *CacheServer) loop() {
@@ -199,12 +198,10 @@ func (s *CacheServer) loop() {
 	for {
 		select {
 		case data := <-s.ch:
-			fmt.Printf("got message %v", data)
-
+			//fmt.Printf("got message in channel %v", data)
 			shard := s.cache.GetShard(data.collectd.Host)
-			fmt.Println("got shard")
-			fmt.Printf("got shard%v", shard)
 			shard.SetCollectD(data.collectd)
+
 		}
 	}
 
@@ -232,14 +229,14 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect implements prometheus.Collector.
+//need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
 	ch <- lastPull
-	var previouspullTime=lastpulltime
-	lastpulltime=int64(time.Now().UnixNano()) / 1e9
+
 	for _, plugin := range c.cache.hosts {
 		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch,previouspullTime)
+		plugin.GetNewMetric(ch)
 	}
 }
 
@@ -289,25 +286,27 @@ func main() {
 		//http.ListenAndServe()
 		log.Fatal(http.ListenAndServe(":8081", nil))
 	}()
+	/*go func(){
+		amqp.AMQP()
+	}()*/
 
 	for {
 		//sleep for 2 secs
 		/*for hostname,pluginCache:= range caches{
 		        setPlugin(hostname,pluginCache )
 		}*/
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 1; i++ {
 			//100o hosts
 			//pluginChannel := make(chan cacheutil.Collectd)
-			var jsondata = generateCollectdJson("hostname", "pluginname")
+			var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
 			//for each host make it on go routine
-			go func() {
-				var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", i)
-				gentestdata(hostname, 100, jsondata, cacheserver)
-			   //collectdPluginData := <-pluginChannel
-   			 //cacheserver.Put(collectdPluginData)
-			}()
+			var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", i)
+			gentestdata(hostname, 1, jsondata, cacheserver)
 
 		}
+		/*for _,shard :=range cacheserver.cache.hosts{
+		fmt.Printf("Whole map %d",len(shard.plugin))
+		}*/
 		time.Sleep(time.Second * 1)
 	}
 
@@ -315,29 +314,36 @@ func main() {
 
 func gentestdata(hostname string, plugincount int, collectdjson string, cacheserver *CacheServer) {
 	//100 plugins
+	var wg sync.WaitGroup
 	for j := 0; j < plugincount; j++ {
 		var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
-		fmt.Printf("index value is ****%d\n",j)
-		fmt.Printf("Plugin_name%s\n",pluginname)
-		var c = cacheutil.Collectd{}
-		cacheutil.ParseCollectdJson(&c, collectdjson)
-		// i have struct now filled with json data
-		//convert this to prometheus format????
+		//fmt.Printf("index value is ****%d\n",j)
+		//fmt.Printf("Plugin_name%s\n",pluginname)
+		wg.Add(1)
+		 go func(){
+			 defer wg.Done()
+				var c = cacheutil.Collectd{}
+				cacheutil.ParseCollectdJson(&c, collectdjson)
+				// i have struct now filled with json data
+				//convert this to prometheus format????
 
-		c.Host = hostname
-		c.Plugin = pluginname
-		c.Type = pluginname
-		c.Plugin_instance = pluginname
-		//to do I need to implment my own unmarshaller for this to work
-		c.Dstypes[0] = "gauge"
-		c.Dstypes[1] = "gauge"
-		c.Dsnames[0] = "value1"
-		c.Dsnames[1] = "value2"
-		c.Values[0] = rand.Float64()
-		c.Values[1] = rand.Float64()
-		c.Time = (time.Now().UnixNano()) / 1000000
-		fmt.Printf("incoming json %s\n", collectdjson)
-		fmt.Printf("%v\n", c)
-		cacheserver.Put(c)
+				c.Host = hostname
+				c.Plugin = pluginname
+				c.Type = pluginname
+				c.Plugin_instance = pluginname
+				//to do I need to implment my own unmarshaller for this to work
+				c.Dstypes[0] = "gauge"
+				c.Dstypes[1] = "gauge"
+				c.Dsnames[0] = "value1"
+				c.Dsnames[1] = "value2"
+				c.Values[0] = rand.Float64()
+				c.Values[1] = rand.Float64()
+				c.Time = (time.Now().UnixNano()) / 1000000
+				//fmt.Printf("incoming json %s\n", collectdjson)
+				//fmt.Printf("Before putting %v\n", c)
+				cacheserver.Put(c)
+		}()
+		wg.Wait()
+
 	}
 }
