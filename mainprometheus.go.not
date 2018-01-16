@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/common/log"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -65,97 +64,14 @@ func generateCollectdJson(hostname string, pluginname string) string {
 }
 
 /****************************************/
-//this is inutdata send to cache server
 type inputData struct {
-	collectd cacheutil.Collectd
-}
-
-//cache server converts it into this
-type InputDataV2 struct {
-	hosts map[string]*ShardedInputDataV2
-	lock  *sync.RWMutex
-}
-
-//type InputDataV2 map[string]*ShardedInputDataV2
-
-type ShardedInputDataV2 struct {
-	plugin map[string]*cacheutil.Collectd
-	lock   *sync.RWMutex
-}
-
-func NewInputDataV2() InputDataV2 {
-	return InputDataV2{
-		hosts: make(map[string]*ShardedInputDataV2),
-		lock:  new(sync.RWMutex),
-	}
-
-}
-func NewShardedInputDataV2() *ShardedInputDataV2 {
-	return &ShardedInputDataV2{
-		plugin: make(map[string]*cacheutil.Collectd),
-		lock:   new(sync.RWMutex),
-	}
-}
-func (i InputDataV2) Put(hostname string) {
-	//mutex.Lock()
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.hosts[hostname] = NewShardedInputDataV2()
-	//mutex.UnLock()
-}
-func (i InputDataV2) GetShard(hostname string) *ShardedInputDataV2 {
-	//GetShard .... add shard
-	var shard = i.hosts[hostname]
-	fmt.Println(shard)
-	if shard == nil {
-		fmt.Println("Shard is empty")
-		i.Put(hostname)
-		fmt.Println(i.hosts[hostname])
-	}
-	return i.hosts[hostname]
-}
-func (shard *ShardedInputDataV2) GetCollectD(pluginname string) cacheutil.Collectd {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-	return *shard.plugin[pluginname]
-}
-
-func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-	if shard.plugin[collectd.Plugin] == nil {
-		shard.plugin[collectd.Plugin] = &cacheutil.Collectd{}
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		shard.plugin[collectd.Plugin].Interval = collectd.Interval
-		shard.plugin[collectd.Plugin].Host = collectd.Host
-		shard.plugin[collectd.Plugin].Plugin = collectd.Plugin
-		shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
-		shard.plugin[collectd.Plugin].Type = collectd.Type
-		shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-	} else {
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		if shard.plugin[collectd.Plugin].Plugin_instance != collectd.Plugin_instance {
-			shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
-		}
-		if shard.plugin[collectd.Plugin].Type != collectd.Type {
-			shard.plugin[collectd.Plugin].Type = collectd.Type
-		}
-		if shard.plugin[collectd.Plugin].Type_instance != collectd.Type_instance {
-			shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-		}
-
-	}
-
+	host       string
+	pluginname string
+	collectd   cacheutil.Collectd
 }
 
 type CacheServer struct {
-	cache InputDataV2
+	cache cacheutil.PrometehusCollector
 	ch    chan inputData
 }
 
@@ -163,8 +79,7 @@ func NewCacheServer() *CacheServer {
 
 	server := &CacheServer{
 		// make() creates builtins like channels, maps, and slices
-		//cache: cacheutil.NewPrometehusCollector(),
-		cache: NewInputDataV2(),
+		cache: cacheutil.NewPrometehusCollector(),
 		ch:    make(chan inputData),
 	}
 	// Spawn off the server's main loop immediately
@@ -172,23 +87,9 @@ func NewCacheServer() *CacheServer {
 	return server
 }
 
-func (s *CacheServer) Put(collectd cacheutil.Collectd) {
+func (s *CacheServer) Put(hostname string, pluginname string, collectd cacheutil.Collectd) {
 	fmt.Println("Putting data")
-	//s.ch <- inputData{host: hostname, pluginname: pluginname, collectd: collectd}
-	s.ch <- inputData{collectd: collectd}
-
-}
-func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
-	for _, collectd := range shard.plugin {
-		for i := range collectd.Values {
-			m, err := cacheutil.NewMetric(*collectd, i)
-			if err != nil {
-				log.Errorf("newMetric: %v", err)
-				continue
-			}
-			ch <- m
-		}
-	}
+	s.ch <- inputData{host: hostname, pluginname: pluginname, collectd: collectd}
 }
 func (s *CacheServer) loop() {
 	// The built-in "range" clause can iterate over channels,
@@ -197,11 +98,21 @@ func (s *CacheServer) loop() {
 		select {
 		case data := <-s.ch:
 			fmt.Printf("got message %v", data)
+			// convert this data to prometheus cache
+			shard := s.cache.GetShard(data.host)
+			for i := range data.collectd.Values {
+				m, err := cacheutil.NewMetric(data.collectd, i)
+				if err != nil {
+					log.Errorf("newMetric: %v", err)
+					continue
+				}
+				metric_name := cacheutil.NewName(data.collectd, i)
+				shard.Put(metric_name, m)
+			}
 
-			shard := s.cache.GetShard(data.collectd.Host)
-			fmt.Println("got shard")
-			fmt.Printf("got shard%v", shard)
-			shard.SetCollectD(data.collectd)
+			//build the cache
+			//default:
+			//  fmt.Println("Nothing to print")
 		}
 	}
 
@@ -211,7 +122,7 @@ func (s *CacheServer) loop() {
 
 /*************** HTTP HANDLER***********************/
 type cacheHandler struct {
-	cache *InputDataV2
+	cache *cacheutil.PrometehusCollector
 }
 
 /*func (h *cacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -231,14 +142,16 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	//ch <- lastPush
-	for _, plugin := range c.cache.hosts {
+	for hostname, m := range *c.cache {
 		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
-
+		for _, m := range m.GetMetrics(hostname) {
+			//fmt.Fprintln(w, k.)
+			ch <- *m
+		}
 	}
 }
 
-func main() {
+func mainp() {
 	//I just learned this  from here http://www.alexedwards.net/blog/a-recap-of-request-handling
 	/*
 	   Processing HTTP requests with Go is primarily abo*testing.T)ut two things: ServeMuxes and Handlers.
@@ -294,9 +207,11 @@ func main() {
 			//100o hosts
 			for j := 0; j < 100; j++ {
 				//100 plugins
+
 				var incoming_json = generateCollectdJson("hostname", "pluginname")
 				var c = cacheutil.Collectd{}
 				cacheutil.ParseCollectdJson(&c, incoming_json)
+
 				// i have struct now filled with json data
 				//convert this to prometheus format????
 				var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", i)
@@ -306,15 +221,18 @@ func main() {
 				//to do I need to implment my own unmarshaller for this to work
 				c.Dstypes[0] = "gauge"
 				c.Dstypes[1] = "gauge"
+
 				c.Dsnames[0] = "value1"
 				c.Dsnames[1] = "value2"
+
 				c.Values[0] = rand.Float64()
 				c.Values[1] = rand.Float64()
+
 				c.Time = (time.Now().UnixNano()) / 1000000
 				fmt.Printf("incoming json %s\n", incoming_json)
 				fmt.Printf("%v\n", c)
 
-				cacheserver.Put(c)
+				cacheserver.Put(hostname, pluginname, c)
 			}
 		}
 		time.Sleep(time.Second * 1)
