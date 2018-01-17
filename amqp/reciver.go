@@ -97,10 +97,10 @@ func AMQP(urlStr string,debug bool,messages chan amqp.Message) {
 
 	// print each message until the count is exceeded.
 	//for i := uint64(0); i < *count; i++ {
-  /*for{
+  for{
 		m := <-messages
 		debugf("%v\n", m.Body())
-	}*/
+	}
 	//fmt.Printf("Received %d messages\n", *count)
 
 	// Close all connections, this will interrupt goroutines blocked in Receiver.Receive()

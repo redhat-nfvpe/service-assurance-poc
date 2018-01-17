@@ -21,13 +21,17 @@ type Collectd struct {
 	Type_instance   string
 	new						bool
 }
-func ParseCollectdJson(c *Collectd, collectdJson string) {
+//ParseCollectdJson   ...
+func ParseCollectdJSON(collectdJson string) *Collectd {
+	c:=make([]Collectd,1)
 	var jsonBlob = []byte(collectdJson)
-	err := json.Unmarshal(jsonBlob, c)
+	err := json.Unmarshal(jsonBlob, &c)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
-	c.new=true
+	c1:=c[0]
+	c1.SetNew(true)
+	return &c1
 
 }
 
@@ -51,7 +55,7 @@ func (vl *Collectd) DSName(index int) string {
 
 //generateCollectdJson   for samples
 func GenerateCollectdJson(hostname string, pluginname string) string {
-	return `{
+	return `[{
       "values":  [0.0,0.0],
       "dstypes":  ["gauge","guage"],
       "dsnames":    ["value1","value2"],
@@ -62,5 +66,5 @@ func GenerateCollectdJson(hostname string, pluginname string) string {
       "plugin_instance": "0",
       "type":            "pluginname",
       "type_instance":   "idle"
-    }`
+    }]`
 }

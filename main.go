@@ -337,8 +337,8 @@ func gentestdata(hostname string, plugincount int, collectdjson string, cacheser
 		wg.Add(1)
 		 go func(){
 			 defer wg.Done()
-				var c = cacheutil.Collectd{}
-				cacheutil.ParseCollectdJson(&c, collectdjson)
+
+				c:=cacheutil.ParseCollectdJSON(collectdjson)
 				// i have struct now filled with json data
 				//convert this to prometheus format????
 
@@ -356,7 +356,7 @@ func gentestdata(hostname string, plugincount int, collectdjson string, cacheser
 				c.Time = (time.Now().UnixNano()) / 1000000
 				//fmt.Printf("incoming json %s\n", collectdjson)
 				//fmt.Printf("Before putting %v\n", c)
-				cacheserver.Put(c)
+				cacheserver.Put(*c)
 		}()
 		wg.Wait()
 
