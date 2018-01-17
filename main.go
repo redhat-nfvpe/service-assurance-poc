@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"fmt"
 )
 
 var (
@@ -156,6 +157,7 @@ func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
 		}
 		shard.plugin[collectd.Plugin].SetNew(true)
 	}
+	fmt.Printf("shared  %v\n",shard.plugin[collectd.Plugin])
 
 }
 
@@ -308,7 +310,7 @@ func main() {
 	//  populateCacheWithHosts(100,"redhat.bosoton.nfv",&caches)
 	go func() {
 		//http.ListenAndServe()
-		log.Fatal(http.ListenAndServe(":8081", nil))
+		log.Fatal(http.ListenAndServe("localhost:8081", nil))
 	}()
 	/*go func(){
 		amqp.AMQP()
@@ -319,14 +321,13 @@ func main() {
 	notifier := make(chan string) // Channel for messages from goroutines to main()
 	var url = "amqp://10.19.110.5:5672/collectd/telemetry"
 	var amqpServer *amqplistener.AMQPServer
-	amqpServer = amqplistener.NewAMQPServer(url, true, 10, notifier)
+	amqpServer = amqplistener.NewAMQPServer(url, true, -1, notifier)
 
 	for {
-		go func() {
 			data := <-amqpServer.GetNotifier()
+			//fmt.Printf("%v",data)
 			c := cacheutil.ParseCollectdJSON(data)
 			cacheserver.Put(*c)
-		}()
 
 	}
 
