@@ -4,11 +4,14 @@ import (
 	"github.com/aneeshkp/service-assurance-goclient/amqp"
 	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+
 	"net/http"
 	"sync"
 	"time"
 	"fmt"
+	"os"
+	"flag"
+	"log"
 )
 
 var (
@@ -19,226 +22,13 @@ var (
 		},
 	)
 )
-var freeList = make(chan *inputData, 100)
 
-//meterics  ... can I send cacheutil
-/*func meterics(w http.ResponseWriter, r *http.Request, cache * cacheutil.Cache) {
-	fmt.Fprintf(w, "I got somes metrics for you.. do you like it")
-}*/
-/*
 
-[
-   {
-     "values":  [1901474177],
-     "dstypes":  ["counter"],
-     "dsnames":    ["value"],
-     "time":      1280959128,
-     "interval":          10,
-     "host":            "leeloo.octo.it",
-     "plugin":          "cpu",
-     "plugin_instance": "0",
-     "type":            "cpu",
-     "type_instance":   "idle"
-   }
- ]*/
 
-//[{"values":[1],"dstypes":["gauge"],"dsnames":["value"],
-//"time":1516043586.976,"interval":0.005,"host":"trex","plugin":"sysevent",
-//"plugin_instance":"","type":"gauge","type_instance":"",
-//"meta":{"@timestamp":"2018-01-15T19:13:06.971065+00:00","@source_host":"trex",
-//"@message":"Jan 15 19:13:06 systemd:Starting Dynamic System Tuning Daemon...","facility":"daemon",
-//"severity":"info","program":"systemd","processid":"-"}}]
-
-/****************************************/
-//this is inutdata send to cache server
-type inputData struct {
-	collectd cacheutil.Collectd
-}
-
-//cache server converts it into this
-type InputDataV2 struct {
-	hosts map[string]*ShardedInputDataV2
-	lock  *sync.RWMutex
-}
-
-//type InputDataV2 map[string]*ShardedInputDataV2
-
-type ShardedInputDataV2 struct {
-	plugin map[string]*cacheutil.Collectd
-	lock   *sync.RWMutex
-}
-
-func NewInputDataV2() InputDataV2 {
-	return InputDataV2{
-		hosts: make(map[string]*ShardedInputDataV2),
-		lock:  new(sync.RWMutex),
-	}
-
-}
-func NewShardedInputDataV2() *ShardedInputDataV2 {
-	return &ShardedInputDataV2{
-		plugin: make(map[string]*cacheutil.Collectd),
-		lock:   new(sync.RWMutex),
-	}
-}
-func (i InputDataV2) Put(hostname string) {
-	//mutex.Lock()
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.hosts[hostname] = NewShardedInputDataV2()
-	//i.hosts[hostname] = nil
-	//mutex.UnLock()
-}
-
-//GetShard  ..
-func (i InputDataV2) GetShard(hostname string) *ShardedInputDataV2 {
-	//GetShard .... add shard
-	//i.lock.Lock()
-	if i.hosts[hostname] == nil {
-		i.Put(hostname)
-	}
-
-	return i.hosts[hostname]
-
-}
-
-//GetCollectD   ..
-func (shard *ShardedInputDataV2) GetCollectD(pluginname string) cacheutil.Collectd {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-	return *shard.plugin[pluginname]
-}
-
-//Size no of plugin per shard
-func (i InputDataV2) Size() int {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-	return len(i.hosts)
-
-}
-
-//Size no of plugin per shard
-func (shard *ShardedInputDataV2) Size() int {
-	shard.lock.RLock()
-	defer shard.lock.RUnlock()
-	return len(shard.plugin)
-
-}
-
-func (shard *ShardedInputDataV2) SetCollectD(collectd cacheutil.Collectd) {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-
-	if shard.plugin[collectd.Plugin] == nil {
-		shard.plugin[collectd.Plugin] = &cacheutil.Collectd{}
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		shard.plugin[collectd.Plugin].Interval = collectd.Interval
-		shard.plugin[collectd.Plugin].Host = collectd.Host
-		shard.plugin[collectd.Plugin].Plugin = collectd.Plugin
-		shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
-		shard.plugin[collectd.Plugin].Type = collectd.Type
-		shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-	} else {
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		if shard.plugin[collectd.Plugin].Plugin_instance != collectd.Plugin_instance {
-			shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
-		}
-		if shard.plugin[collectd.Plugin].Type != collectd.Type {
-			shard.plugin[collectd.Plugin].Type = collectd.Type
-		}
-		if shard.plugin[collectd.Plugin].Type_instance != collectd.Type_instance {
-			shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-		}
-		shard.plugin[collectd.Plugin].SetNew(true)
-	}
-	fmt.Printf("shared  %v\n",shard.plugin[collectd.Plugin])
-
-}
-
-type CacheServer struct {
-	cache InputDataV2
-	ch    chan *inputData
-}
-
-func NewCacheServer() *CacheServer {
-
-	server := &CacheServer{
-		// make() creates builtins like channels, maps, and slices
-		//cache: cacheutil.NewPrometehusCollector(),
-		cache: NewInputDataV2(),
-		ch:    make(chan *inputData),
-	}
-	// Spawn off the server's main loop immediately
-	go server.loop()
-	return server
-}
-
-func (s *CacheServer) Put(collectd cacheutil.Collectd) {
-	//fmt.Println("Putting data")
-	//s.ch <- inputData{host: hostname, pluginname: pluginname, collectd: collectd}
-	s.ch <- &inputData{collectd: collectd}
-
-}
-
-// GetNewMetric
-func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-	for _, collectd := range shard.plugin {
-		if collectd.ISNew() {
-			collectd.SetNew(false)
-			for i := range collectd.Values {
-				//fmt.Printf("Before new metric %v\n", collectd)
-				m, err := cacheutil.NewMetric(*collectd, i)
-				if err != nil {
-					log.Errorf("newMetric: %v", err)
-					continue
-				}
-
-				ch <- m
-			}
-
-		} //else{
-		//	fmt.Println("old data")
-		//}
-	}
-}
-func (s *CacheServer) loop() {
-	// The built-in "range" clause can iterate over channels,
-	// amongst other things
-	for {
-		data := <-s.ch
-		shard := s.cache.GetShard(data.collectd.Host)
-		shard.SetCollectD(data.collectd)
-		// Reuse buffer if there's room.
-		select {
-		case freeList <- data:
-			// Buffer on free list; nothing more to do.
-		default:
-			// Free list full, just carry on.
-		}
-		/*select {
-		case data := <-s.ch:
-			//fmt.Printf("got message in channel %v", data)
-			shard := s.cache.GetShard(data.collectd.Host)
-			shard.SetCollectD(data.collectd)
-
-		}*/
-	}
-
-	// Handle the command
-
-}
 
 /*************** HTTP HANDLER***********************/
 type cacheHandler struct {
-	cache *InputDataV2
+	cache *cacheutil.InputDataV2
 }
 
 /*func (h *cacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -261,26 +51,54 @@ func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
 	ch <- lastPull
 
-	for _, plugin := range c.cache.hosts {
+	for _, plugin := range c.cache.GetHosts() {
 		//fmt.Fprintln(w, hostname)
 		plugin.GetNewMetric(ch)
 	}
 }
 
+// Usage and command-line flags
+func usage() {
+	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
+	fmt.Fprintln(os.Stdout,`''`)
+	fmt.Fprintln(os.Stdout, `For running with AMQP and Prometheus use following option`)
+	fmt.Fprintln(os.Stdout,`'********************* Production *********************'`)
+	fmt.Fprintln(os.Stdout, `go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry `)
+	fmt.Fprintln(os.Stdout,`'**************************************************************'`)
+  fmt.Fprintln(os.Stdout,`''`)
+  fmt.Fprintln(os.Stdout,`''`)
+	fmt.Fprintln(os.Stdout, `For running Sample data wihout AMQP use following option\n`)
+	fmt.Fprintln(os.Stdout,`'********************* Sample Data *********************'`)
+	fmt.Fprintln(os.Stdout, `go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 `)
+	fmt.Fprintln(os.Stdout,`'**************************************************************'`)
+	flag.PrintDefaults()
+}
+
+
+var f_exporterhost = flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
+var f_exporterport = flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
+var f_amqpurl = flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
+var f_count = flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
+
+var f_sampledata = flag.Bool("usesample", false, "Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)")
+var f_hosts = flag.Int("h", 1, "No of hosts : Sample hosts required (deafult 1).")
+var f_plugins = flag.Int("p", 100, "No of plugins: Sample plugins per host(default 100).")
+var f_iterations = flag.Int("t", 1, "No of times to run sample data (default 1) -1 for ever.")
+
+
 func main() {
-	//I just learned this  from here http://www.alexedwards.net/blog/a-recap-of-request-handling
-	/*
-	   Processing HTTP requests with Go is primarily abo*testing.T)ut two things: ServeMuxes and Handlers.
-	   The http.ServeMux is itself an http.Handler, so it can be passed into http.ListenAndServe.
-	*/
-	//var caches=make(cacheutil.Cache)
-	var cacheserver = NewCacheServer()
-	//nodeExport :=for i:=0;i<100;i++ { http.NewServeMux()
-	myHandler := &cacheHandler{cache: &cacheserver.cache}
-	/*	s := &http.Server{
-	    Addr:           ":9002",
-	    Handler:      myHandler  ,
-	}*/
+	flag.Usage = usage
+  flag.Parse()
+
+	if *f_sampledata==false && len(*f_amqpurl) == 0 {
+		log.Println("AMQP URL is not provided")
+		usage()
+		os.Exit(1)
+	}
+	//Cache sever to process and serve the exporter
+	var cacheserver = cacheutil.NewCacheServer()
+
+	myHandler := &cacheHandler{cache: cacheserver.GetCache()}
 
 	prometheus.MustRegister(myHandler)
 	http.Handle("/metrics", prometheus.Handler())
@@ -294,41 +112,47 @@ func main() {
              </html>`))
 	})
 
-	//prometheus.MustRegister(myHandler)
-	//s.Handle(*metricsPath, prometheus.Handler())
 
-	//nodeExport.HandleFunc("/meterics", meterics(&cache))
-	/***** use channel to pass the variable?????
-	  channel is blocking... have to find a better way.. may be send pointer to cache
-	*/
-
-	// send it to its own g rountine
-	//newbie I must be making ton of mistakes :-(
-	//don't know how to handle if this goes down... do we need to restart whole app?
-	/// need to do self rstarting thing
-
-	//  populateCacheWithHosts(100,"redhat.bosoton.nfv",&caches)
+	//run exporter fro prometheus to scrape
 	go func() {
-		//http.ListenAndServe()
-		log.Fatal(http.ListenAndServe("localhost:8081", nil))
+		var metricsURL=fmt.Sprintf("%s:%d",*f_exporterhost,*f_exporterport)
+		log.Fatal(http.ListenAndServe(metricsURL, nil))
 	}()
-	/*go func(){
-		amqp.AMQP()
-	}()*/
-	//foramqp
-	//messages := make(chan amqp.Message) // Channel for messages from goroutines to main()
-	//defer close(messages)
-	notifier := make(chan string) // Channel for messages from goroutines to main()
-	var url = "amqp://10.19.110.5:5672/collectd/telemetry"
-	var amqpServer *amqplistener.AMQPServer
-	amqpServer = amqplistener.NewAMQPServer(url, true, -1, notifier)
 
-	for {
-			data := <-amqpServer.GetNotifier()
-			//fmt.Printf("%v",data)
-			c := cacheutil.ParseCollectdJSON(data)
-			cacheserver.Put(*c)
+  if *f_sampledata {
+		  if *f_iterations==-1{
+				*f_iterations=9999999
+			}
+			var hostwaitgroup sync.WaitGroup
+			var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
+			fmt.Printf("Test data  will run for %d times ",*f_iterations)
+			for times := 1; times <= *f_iterations; times++ {
+				hostwaitgroup.Add(*f_hosts)
+				for hosts := 0; hosts < *f_hosts; hosts++ {
+					go func(host_id int) {
+						defer hostwaitgroup.Done()
+						var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
+						go cacheutil.GenrateSampleData(hostname, *f_plugins, jsondata, cacheserver)
+					}(hosts)
 
+				}
+				hostwaitgroup.Wait()
+				time.Sleep(time.Second * 1)
+			}
+
+	}else{
+		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
+		notifier := make(chan string) // Channel for messages from goroutines to main()
+		var amqpurl = fmt.Sprintf("amqp://%s",*f_amqpurl)
+		var amqpServer *amqplistener.AMQPServer
+		amqpServer = amqplistener.NewAMQPServer(amqpurl, true, *f_count, notifier)
+		for {
+				data := <-amqpServer.GetNotifier()
+				//fmt.Printf("%v",data)
+				c := cacheutil.ParseCollectdJSON(data)
+				cacheserver.Put(*c)
+		}
 	}
+
 
 }

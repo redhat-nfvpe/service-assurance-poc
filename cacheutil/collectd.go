@@ -3,9 +3,9 @@ package cacheutil
 import (
 	"encoding/json"
 	"fmt"
-
+  "math/rand"
 	"strconv"
-
+  "time"
 )
 
 type Collectd struct {
@@ -20,6 +20,28 @@ type Collectd struct {
 	Type            string `json:"type"`
 	Type_instance   string
 	new						bool
+}
+//GenrateSampleData
+func GenrateSampleData(hostname string, plugincount int, collectdjson string, cacheserver *CacheServer) {
+	//100 plugins
+	for j := 0; j < plugincount; j++ {
+		var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
+		go func() {
+			c := ParseCollectdJSON(collectdjson)
+			c.Host = hostname
+			c.Plugin = pluginname
+			c.Type = pluginname
+			c.Plugin_instance = pluginname
+			c.Dstypes[0] = "gauge"
+			c.Dstypes[1] = "gauge"
+			c.Dsnames[0] = "value1"
+			c.Dsnames[1] = "value2"
+			c.Values[0] = rand.Float64()
+			c.Values[1] = rand.Float64()
+			c.Time = float64((time.Now().UnixNano())) / 1000000
+			cacheserver.Put(*c)
+		}()
+	}
 }
 //ParseCollectdJSON   ...
 func ParseCollectdJSON(collectdJson string) *Collectd {

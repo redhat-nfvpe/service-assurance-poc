@@ -112,9 +112,9 @@ func (shard *ShardedPrometehusCollector) Size() int {
 func NewName(vl Collectd, index int) string {
 	var name string
 	if vl.Plugin == vl.Type {
-		name = "collectd_" + vl.Type
+		name = "service_assurance_collectd_" + vl.Type
 	} else {
-		name = "collectd_" + vl.Plugin + "_" + vl.Type
+		name = "service_assurance_collectd_" + vl.Plugin + "_" + vl.Type
 	}
 
 	if dsname := vl.DSName(index); dsname != "value" {
@@ -149,7 +149,7 @@ func newLabels(vl Collectd) prometheus.Labels {
 
 //newDesc converts one data source of a value list to a Prometheus description.
 func newDesc(vl Collectd, index int) *prometheus.Desc {
-	help := fmt.Sprintf("Collectd exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
+	help := fmt.Sprintf("Service Assurance exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
 		vl.Plugin, vl.Type, vl.Dstypes[index], vl.DSName(index))
 
 	return prometheus.NewDesc(NewName(vl, index), help, []string{}, newLabels(vl))
