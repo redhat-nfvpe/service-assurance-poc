@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"strconv"
-
 )
 
 type Collectd struct {
@@ -19,24 +18,39 @@ type Collectd struct {
 	Plugin_instance string
 	Type            string `json:"type"`
 	Type_instance   string
-	new						bool
+	new             bool
 }
-//ParseCollectdJson   ...
+
+//ParseCollectdJSON   ...
 func ParseCollectdJSON(collectdJson string) *Collectd {
-	c:=make([]Collectd,1)
+	c := make([]Collectd, 1)
 	var jsonBlob = []byte(collectdJson)
 	err := json.Unmarshal(jsonBlob, &c)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
-	c1:=c[0]
+	c1 := c[0]
+	c1.SetNew(true)
+	return &c1
+
+}
+
+//ParseCollectdByte ....
+func ParseCollectdByte(amqpCollectd []byte) *Collectd {
+	c := make([]Collectd, 1)
+	//var jsonBlob = []byte(collectdJson)
+	err := json.Unmarshal(amqpCollectd, &c)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	c1 := c[0]
 	c1.SetNew(true)
 	return &c1
 
 }
 
 func (c *Collectd) SetNew(new bool) {
-	c.new=new
+	c.new = new
 }
 func (c *Collectd) ISNew() bool {
 	return c.new
