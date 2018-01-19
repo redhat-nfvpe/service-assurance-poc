@@ -166,7 +166,7 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 	defer shard.lock.Unlock()
 	for _, collectd := range shard.plugin {
 
-		if collectd.ISNew() {
+		if 1==1 || collectd.ISNew()   {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
