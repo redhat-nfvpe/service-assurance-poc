@@ -17,7 +17,7 @@ import (
 var (
 	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "collectd_last_pull_timestamp_seconds",
+			Name: "service_assurance_collectd_last_pull_timestamp_seconds",
 			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
 		},
 	)

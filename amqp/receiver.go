@@ -137,8 +137,7 @@ func (s *AMQPServer) start() {
     //fmt.Println(reflect.TypeOf( m.Body()))
 		//fmt.Printf("%v\n", m.Body())
     amqpBinary:=m.Body().(amqp.Binary)
-    fmt.Printf("The Go String%s\n", amqpBinary.String())
-
+    //fmt.Printf("The Go String%s\n", amqpBinary.String())
     s.notifier <-  amqpBinary.String()
 	}
 

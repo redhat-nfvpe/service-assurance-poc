@@ -149,7 +149,7 @@ func newLabels(vl Collectd) prometheus.Labels {
 
 //newDesc converts one data source of a value list to a Prometheus description.
 func newDesc(vl Collectd, index int) *prometheus.Desc {
-	help := fmt.Sprintf("Service Assurance exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
+	help := fmt.Sprintf("service_assurance_collectd: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
 		vl.Plugin, vl.Type, vl.Dstypes[index], vl.DSName(index))
 
 	return prometheus.NewDesc(NewName(vl, index), help, []string{}, newLabels(vl))
