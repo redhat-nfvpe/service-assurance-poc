@@ -4,6 +4,7 @@ import (
 "github.com/prometheus/client_golang/prometheus"
   "log"
   "sync"
+
 )
 var freeList = make(chan *inputData, 100)
 /****************************************/
@@ -164,12 +165,14 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	for _, collectd := range shard.plugin {
+    log.Printf("newMetric: %#v", collectd)
 		if collectd.ISNew() {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
 				m, err := NewMetric(*collectd, index)
 				if err != nil {
+
 					log.Printf("newMetric: %v", err)
 					continue
 				}

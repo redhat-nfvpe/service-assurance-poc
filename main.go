@@ -48,13 +48,15 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 //need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
-	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
-	ch <- lastPull
+	log.Println("Collect ")
+	//ch <- lastPull
 
 	for _, plugin := range c.cache.GetHosts() {
 		//fmt.Fprintln(w, hostname)
 		plugin.GetNewMetric(ch)
 	}
+	//lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
+
 }
 
 // Usage and command-line flags
