@@ -1,19 +1,24 @@
 package incoming
 
-type  Interface interface{
+type  IncomingDataInterface interface{
   GetName() string
-  SetData(data interface{})
+  SetData(data IncomingDataInterface)
   ParseInputJSON(json string) error
-  GenerateSampleData(key string, itemkey string)
+  GetKey()string
+  GetItemKey()string
+  GenerateSampleData(key string, itemkey string) IncomingDataInterface
   GenerateSampleJson( key string, itemkey string) string
+  ParseInputByte(data []byte) error
   //GenerateSamples(jsonstring string) *Interface
   SetNew(new bool)
   ISNew() bool
   TSDB
 }
 
+
+//TSDB  interface
 type TSDB interface{
-  //prometheus specifiv
+  //prometheus specifivreflect
   GetLabels()map[string]string
   GetMetricName(index int)string
   GetMetricDesc(index int) string
@@ -26,7 +31,7 @@ const (
 
 )
 
-func NewInComing(t IncomingDataType) Interface {
+func NewInComing(t IncomingDataType) IncomingDataInterface {
     switch t {
     case COLLECTD:
         return newCollectd( /*...*/ )
@@ -36,4 +41,14 @@ func NewInComing(t IncomingDataType) Interface {
 //CreateFactory
 func newCollectd() *Collectd{
   return new(Collectd)
+}
+
+func GenerateData(dataItem IncomingDataInterface,key string, itemkey string) IncomingDataInterface{
+  return dataItem.GenerateSampleData(key ,itemkey)
+}
+func GenerateJson(dataItem IncomingDataInterface, key string, itemkey string) string{
+  return dataItem.GenerateSampleJson(key,itemkey)
+}
+func ParseByte(dataItem IncomingDataInterface,data []byte) error {
+  return dataItem.ParseInputByte(data)
 }

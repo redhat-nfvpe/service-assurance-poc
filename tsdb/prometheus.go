@@ -1,4 +1,4 @@
-package cacheutil
+package tsdb
 
 import (
 	"fmt"

@@ -3,69 +3,80 @@ package incoming
 import (
 	"testing"
   "strconv"
+	"reflect"
 )
+func GetFieldStr(dataItem IncomingDataInterface, field string) string {
+    r := reflect.ValueOf(dataItem)
+    f := reflect.Indirect(r).FieldByName(field)
+    return string(f.String())
+}
 
 func TestCollected(t *testing.T) {
-	c := CreateNewCollectd()
+	c := NewInComing(COLLECTD)
 	jsonString := c.GenerateSampleJson("hostname", "plugi_name")
 	if len(jsonString) == 0 {
 		t.Error("Empty sample string generated")
 	}
 
-	c1 := CreateNewCollectd()
-	if len(c1.Plugin) != 0 {
+	c1 := NewInComing(COLLECTD)
+	if len(GetFieldStr(c1,"Plugin")) != 0 {
 		t.Error("Collectd data  is not empty.")
 	}
 	//2
-	c1.GenerateSampleData("hostname", "plugi_name")
-	if len(c1.Plugin) == 0 {
+	sample:=c1.GenerateSampleData("hostname", "plugi_name")
+	if len(GetFieldStr(sample,"Plugin")) == 0 {
 		t.Errorf("Collectd data was not populated by GenrateSampleData %v", c1)
 	}
-	c1 = CreateNewCollectd()
+	c1 = NewInComing(COLLECTD)
 	c1.ParseInputJSON(jsonString)
-	if len(c1.Plugin) == 0 {
+	if len(GetFieldStr(c1,"Plugin")) == 0 {
 		t.Errorf("Collectd data was not populated by ParsestrconvInputJSON %#v", c1)
 	}
 	//check DSName method
-	for index := range c1.Values {
-		dsname := c1.DSName(index)
-		if len(dsname) == 0 {
-			t.Errorf("Collectd DSName is empty %#v", dsname)
+
+	if collectd, ok := c1.(*Collectd); ok {
+		for index := range collectd.Values {
+			dsname := collectd.DSName(index)
+			if len(dsname) == 0 {
+				t.Errorf("Collectd DSName is empty %#v", dsname)
+			}
 		}
+		//pass all DSname
+	  collectd.Dsnames=nil
+	  dsname:=collectd.DSName(0)
+	  if dsname != strconv.FormatInt(int64(0), 10) {
+	    t.Errorf("Collectd DSName is not eq to value %s", strconv.FormatInt(int64(0), 10))
+	  }
+	  collectd.Values=[]float64{1}
+	  dsname=collectd.DSName(0)
+	  if dsname != "value" {
+	    t.Errorf("Collectd DSName is not eq to value %s", dsname)
+	  }
+
+
 	}
-  //pass all DSname
-  c1.Dsnames=nil
-  dsname:=c1.DSName(0)
-  if dsname != strconv.FormatInt(int64(0), 10) {
-    t.Errorf("Collectd DSName is not eq to value %s", strconv.FormatInt(int64(0), 10))
-  }
-  c1.Values=[]float64{1}
-  dsname=c1.DSName(0)
-  if dsname != "value" {
-    t.Errorf("Collectd DSName is not eq to value %s", dsname)
-  }
 
 
-	c1 =CreateNewCollectd()
-	c1.ParseCollectdByte([]byte(jsonString))
-	if len(c1.Plugin) == 0 {
+	c1 =NewInComing(COLLECTD)
+	c1.ParseInputByte([]byte(jsonString))
+	if len(GetFieldStr(c1,"Plugin")) == 0 {
 		t.Errorf("Collectd data was not populated by ParseCollectdByte %#v", c1)
 	}
-  errors:=c1.ParseCollectdByte([]byte("error string"))
+  errors:=c1.ParseInputByte([]byte("error string"))
   if errors==nil {
     t.Errorf("Excepted error got nil%v",errors)
   }
 }
 
 func TestCollectedMetrics(t *testing.T) {
-	c1 :=CreateNewCollectd()
-  c:=CreateNewCollectd()
+	c1 :=NewInComing(COLLECTD)
+  c:=NewInComing(COLLECTD)
 	jsonString := c.GenerateSampleJson("hostname", "plugi_name")
 	if len(jsonString) == 0 {
 		t.Error("Empty sample string generated")
 	}
 	c1.ParseInputJSON(jsonString)
-	if len(c1.Plugin) == 0 {
+	if len(GetFieldStr(c1,"Plugin")) == 0 {
 		t.Errorf("Collectd data was not populated by ParseInputJSON %#v", c1)
 	}
   errors:=c1.ParseInputJSON("Error Json")

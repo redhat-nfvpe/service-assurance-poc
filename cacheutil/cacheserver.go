@@ -3,66 +3,68 @@ package cacheutil
 import (
 	"github.com/prometheus/client_golang/prometheus"
   "github.com/aneeshkp/service-assurance-goclient/incoming"
+	"github.com/aneeshkp/service-assurance-goclient/tsdb"
 	"log"
 	"sync"
-	"errors"
+	//"errors"
+	"fmt"
 )
 
-var freeList = make(chan *Incoming, 100)
-
+var freeList = make(chan *IncomingBuffer, 100)
+var quitCacheServerCh = make(chan struct{})
 /****************************************/
-//Incoming  this is inut data send to cache server
-//Incoming  ..its of type collectd or anything else
-type Incoming struct {
-	data interface{}
+//IncomingBuffer  this is inut data send to cache server
+//IncomingBuffer  ..its of type collectd or anything else
+type IncomingBuffer struct {
+	data incoming.IncomingDataInterface
 }
 
-//IncomingCache cache server converts it into this
-type IncomingCache struct {
-	hosts map[string]*ShardedIncomingCache
+//IncomingDataCache cache server converts it into this
+type IncomingDataCache struct {
+	hosts map[string]*ShardedIncomingDataCache
 	lock  *sync.RWMutex
 }
 
 //types of sharded cache collectd, influxdb etc
 //type InputDataV2 map[string]*ShardedInputDataV2
-//ShardedIncomingCache  ..
-type ShardedIncomingCache struct {
-	plugin map[string]*incoming.Interface
+//ShardedIncomingDataCache  ..
+type ShardedIncomingDataCache struct {
+	plugin map[string]incoming.IncomingDataInterface
 	lock   *sync.RWMutex
 }
 
-//IncomingCache   .. .
-func NewCache() IncomingCache {
-	return IncomingCache{
-		hosts: make(map[string]*ShardedIncomingCache),
+//IncomingDataCache   .. .
+func NewCache() IncomingDataCache {
+	return IncomingDataCache{
+		hosts: make(map[string]*ShardedIncomingDataCache),
 		lock:  new(sync.RWMutex),
 	}
 }
 
-//NewShardedIncomingCache   .
-func NewShardedIncomingCache() *ShardedIncomingCache {
-	return &ShardedIncomingCache{
-		plugin: make(map[string]*incoming.Interface),
+//NewShardedIncomingDataCache   .
+func NewShardedIncomingDataCache() *ShardedIncomingDataCache {
+	return &ShardedIncomingDataCache{
+		plugin: make(map[string]incoming.IncomingDataInterface),
 		lock:   new(sync.RWMutex),
 	}
 }
 
 //PUT   ..
-func (i IncomingCache) Put(key string) {
+func (i IncomingDataCache) Put(key string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	i.hosts[key] = NewShardedIncomingCache()
+	i.hosts[key] = NewShardedIncomingDataCache()
 }
 
 //GetHosts  Get All hosts
-func (i IncomingCache) GetHosts() map[string]*ShardedIncomingCache {
+func (i IncomingDataCache) GetHosts() map[string]*ShardedIncomingDataCache {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	return i.hosts
 }
 
 //GetShard  ..
-func (i IncomingCache) GetShard(key string) *ShardedIncomingCache {
+func (i IncomingDataCache) GetShard(key string) *ShardedIncomingDataCache {
 	//GetShard .... add shard
 	//i.lock.Lock()
 	if i.hosts[key] == nil {
@@ -74,14 +76,14 @@ func (i IncomingCache) GetShard(key string) *ShardedIncomingCache {
 }
 
 //GetCollectD   ..
-func (shard *ShardedIncomingCache) GetData(pluginname string) incoming.Interface {
+func (shard *ShardedIncomingDataCache) GetData(pluginname string) incoming.IncomingDataInterface {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	return shard.plugin[pluginname]
 }
 
 //Size no of plugin per shard
-func (i IncomingCache) Size() int {
+func (i IncomingDataCache) Size() int {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 	return len(i.hosts)
@@ -89,72 +91,72 @@ func (i IncomingCache) Size() int {
 }
 
 //Size no of plugin per shard
-func (shard *ShardedIncomingCache) Size() int {
+func (shard *ShardedIncomingDataCache) Size() int {
 	shard.lock.RLock()
 	defer shard.lock.RUnlock()
 	return len(shard.plugin)
 
 }
 
+//TODO : add generic
 //SetData
-func (shard *ShardedIncomingCache) SetData(data interface{}) error {
+func (shard *ShardedIncomingDataCache) SetData(data incoming.IncomingDataInterface) error {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-  if collectd, ok := data.(incoming.Collectd); ok {
-		shard.lock.Lock()
-		defer shard.lock.Unlock()
-		if shard.plugin[collectd.GetName()] == nil {
-				shard.plugin[collectd.GetName()] =*incoming.CreateNewCollectd()
-		}
-		 shard.plugin[collectd.GetName()].SetData(data)
-		 return nil
-	}else{
-    return errors.New("unknow data type while setting data")
+	if shard.plugin[data.GetItemKey()] == nil {
+		//TODO: change this to more generic later
+			shard.plugin[data.GetItemKey()] =incoming.NewInComing(incoming.COLLECTD)
 	}
+	shard.plugin[data.GetItemKey()].SetData(data)
+	return nil
+
+  //return errors.New("unknow data type while setting data")
+
 
 
 }
 
 //CacheServer   ..
 type CacheServer struct {
-	cache IncomingCache
-	ch    chan Incoming
+	cache IncomingDataCache
+	ch    chan IncomingBuffer
 }
 
 //GetCache  Get All hosts
-func (c *CacheServer) GetCache() *IncomingCache {
-	return &c.cache
+func (cs *CacheServer) GetCache() *IncomingDataCache {
+	return &cs.cache
 }
 
 //NewCacheServer   ...
 func NewCacheServer(cacheType incoming.IncomingDataType) *CacheServer {
 	server := &CacheServer{
 		cache: NewCache(),
-		ch:    make(chan Incoming),
+		ch:    make(chan IncomingBuffer),
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
 	return server
 }
 
-func (s *CacheServer) Put(data interface{}) {
-	if collectd, ok := data.(incoming.Collectd); ok {
-		s.ch <- Incoming{data: collectd}
-	}
+//Put   ..
+func (cs *CacheServer) Put(incomingData incoming.IncomingDataInterface) {
+	//if collectd, ok := data.(*incoming.Collectd); ok {
+		cs.ch <- IncomingBuffer{data: incomingData}
+	//}
 
 }
 
 //GetNewMetric   generate Prometheus metrics
-func (shard *ShardedIncomingCache) GetNewMetric(ch chan<- prometheus.Metric) {
+func (shard *ShardedIncomingDataCache) GetNewMetric(ch chan<- prometheus.Metric) {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-	for _, incomingInterface := range shard.plugin {
-		if collectd, ok := incomingInterface.(incoming.Collectd); ok {
+	for _, IncomingDataInterface := range shard.plugin {
+		if collectd, ok := IncomingDataInterface.(*incoming.Collectd); ok {
 		if collectd.ISNew() {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
-				m, err := NewMetric(*collectd, index)
+				m, err := tsdb.NewCollectdMetric(*collectd, index)
 				if err != nil {
 					log.Printf("newMetric: %v", err)
 					continue
@@ -166,17 +168,24 @@ func (shard *ShardedIncomingCache) GetNewMetric(ch chan<- prometheus.Metric) {
 		}
 	}
 }
-func (s *CacheServer) loop() {
+func (cs CacheServer) close(){
+	<-quitCacheServerCh
+	close(quitCacheServerCh)
+}
+func (cs CacheServer) loop() {
 	// The built-in "range" clause can iterate over channels,
 	// amongst other things
+LOOP:
 	for {
-		data := <-s.ch
-		shard := s.cache.GetShard(data.collectd.Host)
-		shard.SetCollectD(data.collectd)
+		buffer := <-cs.ch
+		shard := cs.cache.GetShard(buffer.data.GetKey())
+		shard.SetData(buffer.data)
 		// Reuse buffer if there's room.
 		select {
-		case freeList <- data:
+		case freeList <- &buffer:
 			// Buffer on free list; nothing more to do.
+		case <-quitCacheServerCh:
+			  break LOOP
 		default:
 			// Free list full, just carry on.
 		}
@@ -192,41 +201,19 @@ func (s *CacheServer) loop() {
 }
 
 
-//GenrateSampleData
-func (cs *CacheServer)GenrateSampleData(key string, datacount int, jsonString string,datatype interface{}) {
+//GenrateSampleData  ....
+func (cs *CacheServer)GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
 	//100 plugins
-	for j := 0; j < datacount; j++ {
-		var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
-		go func() {
-      switch datatype.(Type) {
-      case incoming.Collectd:
-        data=datatype.(incoming.Collectd).GenrateSampleData(key,pluginname,jsonstring)
-        c.Host = hostname
-  			c.Plugin = pluginname
-  			c.Type = pluginname
-  			c.Plugin_instance = pluginname
-  			c.Dstypes[0] = "gauge"
-  			c.Dstypes[1] = "gauge"
-  			c.Dsnames[0] = "value1"
-  			c.Dsnames[1] = "value2"
-  			c.Values[0] = rand.Float64()
-  			c.Values[1] = rand.Float64()
-  			c.Time = float64((time.Now().UnixNano())) / 1000000
-
-      }
-			c := incoming.ParseInputJSON(json)
-			c.Host = hostname
-			c.Plugin = pluginname
-			c.Type = pluginname
-			c.Plugin_instance = pluginname
-			c.Dstypes[0] = "gauge"
-			c.Dstypes[1] = "gauge"
-			c.Dsnames[0] = "value1"
-			c.Dsnames[1] = "value2"
-			c.Values[0] = rand.Float64()
-			c.Values[1] = rand.Float64()
-			c.Time = float64((time.Now().UnixNano())) / 1000000
-			cs.Put(*c)
-		}()
+	var hostwaitgroup sync.WaitGroup
+	hostwaitgroup.Add(itemCount)
+	for j := 0; j < itemCount; j++ {
+		var pluginname = fmt.Sprintf("%s_%d", "plugin_name_", j)
+		go func(pluginname string ) {
+			defer hostwaitgroup.Done()
+			 var newSample incoming.IncomingDataInterface
+			 newSample=datatype.GenerateSampleData(key, pluginname)
+       cs.Put(newSample)
+		}(pluginname)
 	}
+	hostwaitgroup.Wait()
 }

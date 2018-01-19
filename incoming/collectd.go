@@ -22,7 +22,7 @@ type Collectd struct {
 	Type_instance   string
 	new             bool
 }
-//CreateFactory
+//CreateNewCollectd don't use .... use incoming.NewInComing
 func CreateNewCollectd() *Collectd{
   return new(Collectd)
 }
@@ -32,8 +32,12 @@ func (c Collectd) GetName() string {
 	return c.Plugin
 }
 
-//ParseCollectdByte ....
-func (c *Collectd)ParseCollectdByte(data []byte) error{
+//GetKey ...
+func (c Collectd) GetKey() string{
+	return c.Host
+}
+//ParseInputByte ....
+func (c *Collectd)ParseInputByte(data []byte) error{
 	cparse := make([]Collectd, 1)
 	//var jsonBlob = []byte(collectdJson)
 	err := json.Unmarshal(data, &cparse)
@@ -43,7 +47,7 @@ func (c *Collectd)ParseCollectdByte(data []byte) error{
 	}
   c1 := cparse[0]
 	c1.SetNew(true)
-	c.SetData(c1)
+	c.SetData(&c1)
   return nil
 }
 
@@ -68,32 +72,29 @@ func (c *Collectd) DSName(index int) string {
 }
 
 //SetData   ...
-func (c *Collectd) SetData(data interface{}) {
-	if collectd, ok := data.(Collectd); ok { // type assert on it
-
-
-	if c.Host != collectd.Host {
-		c.Host = collectd.Host
-	}
-	if c.Plugin != collectd.Plugin {
-		c.Plugin = collectd.Plugin
-	}
-
-	c.Interval = collectd.Interval
-	c.Values = collectd.Values
-	c.Dsnames = collectd.Dsnames
-	c.Dstypes = collectd.Dstypes
-	c.Time = collectd.Time
-	if c.Plugin_instance != collectd.Plugin_instance {
-		c.Plugin_instance = collectd.Plugin_instance
-	}
-	if c.Type != collectd.Type {
-		c.Type = collectd.Type
-	}
-	if c.Type_instance != collectd.Type_instance {
-		c.Type_instance = collectd.Type_instance
-	}
-	c.SetNew(true)
+func (c *Collectd) SetData(data IncomingDataInterface) {
+	if collectd, ok := data.(*Collectd); ok { // type assert on it
+		if c.Host != collectd.Host {
+			c.Host = collectd.Host
+		}
+		if c.Plugin != collectd.Plugin {
+			c.Plugin = collectd.Plugin
+		}
+		c.Interval = collectd.Interval
+		c.Values = collectd.Values
+		c.Dsnames = collectd.Dsnames
+		c.Dstypes = collectd.Dstypes
+		c.Time = collectd.Time
+		if c.Plugin_instance != collectd.Plugin_instance {
+			c.Plugin_instance = collectd.Plugin_instance
+		}
+		if c.Type != collectd.Type {
+			c.Type = collectd.Type
+		}
+		if c.Type_instance != collectd.Type_instance {
+			c.Type_instance = collectd.Type_instance
+		}
+		c.SetNew(true)
 	}
 }
 
@@ -144,17 +145,23 @@ func (c Collectd) GetMetricName(index int) string {
 
 }
 
+func (c Collectd) GetItemKey() string {
+	return c.Plugin
+}
+
 //GenerateSampleData
-func (c *Collectd) GenerateSampleData(hostname string, pluginname string) {
-	c.Host = hostname
-	c.Plugin = pluginname
-	c.Type = pluginname
-	c.Plugin_instance = pluginname
-	c.Dstypes = []string{"guage", "gauge"}
-	c.Dsnames = []string{"value1", "value2"}
-	c.Type_instance = "idle"
-	c.Values = []float64{rand.Float64(), rand.Float64()}
-	c.Time = float64((time.Now().UnixNano())) / 1000000
+func (c *Collectd) GenerateSampleData(hostname string, pluginname string) IncomingDataInterface {
+  collectd:=CreateNewCollectd()
+	collectd.Host = hostname
+	collectd.Plugin = pluginname
+	collectd.Type = pluginname
+	collectd.Plugin_instance = pluginname
+	collectd.Dstypes = []string{"guage", "gauge"}
+	collectd.Dsnames = []string{"value1", "value2"}
+	collectd.Type_instance = "idle"
+	collectd.Values = []float64{rand.Float64(), rand.Float64()}
+	collectd.Time = float64((time.Now().UnixNano())) / 1000000
+	return collectd
 }
 
 //ParseCollectdJSON   ...
@@ -168,13 +175,13 @@ func (c *Collectd) ParseInputJSON(jsonString string) error {
 	}
 	c1 := collect[0]
 	c1.SetNew(true)
-	c.SetData(c1)
+	c.SetData(&c1)
   return nil
 
 }
 
 //generateCollectdJson   for samples
-func (c *Collectd) GenerateSampleJson(hostname string, pluginname string) string {
+func (c Collectd) GenerateSampleJson(hostname string, pluginname string) string {
 	return `[{
       "values":  [0.0,0.0],
       "dstypes":  ["gauge","guage"],
