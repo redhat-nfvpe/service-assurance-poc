@@ -172,10 +172,10 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
 				m, err := NewMetric(*collectd, index)
-        log.Printf("Generated new Meteric: %#v\n", m)
+        log.Printf("Generated new Metric: %#v\n", m)
 				if err != nil {
 
-					log.Printf("newMetric: %v\n", err)
+					log.Printf("newMtric: %v\n", err)
 					continue
 				}
 
