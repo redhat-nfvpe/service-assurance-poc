@@ -162,11 +162,12 @@ func (s *CacheServer) Put(collectd Collectd) {
 
 //GetNewMetric   generate Prometheus metrics
 func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
+  log.Println("****************************   PROMETHEUS IS HERE ********************")
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	for _, collectd := range shard.plugin {
-
-		if 1==1 || collectd.ISNew()   {
+    //1==1 ||
+		if collectd.ISNew()   {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
