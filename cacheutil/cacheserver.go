@@ -1,82 +1,87 @@
 package cacheutil
 
 import (
-"github.com/prometheus/client_golang/prometheus"
-  "log"
-  "sync"
+	"github.com/prometheus/client_golang/prometheus"
+  "github.com/aneeshkp/service-assurance-goclient/incoming"
+	"log"
+	"sync"
+	"errors"
 )
-var freeList = make(chan *inputData, 100)
+
+var freeList = make(chan *Incoming, 100)
+
 /****************************************/
-//this is inutdata send to cache server
-type inputData struct {
-	collectd Collectd
+//Incoming  this is inut data send to cache server
+//Incoming  ..its of type collectd or anything else
+type Incoming struct {
+	data interface{}
 }
 
-//cache server converts it into this
-type InputDataV2 struct {
-	hosts map[string]*ShardedInputDataV2
+//IncomingCache cache server converts it into this
+type IncomingCache struct {
+	hosts map[string]*ShardedIncomingCache
 	lock  *sync.RWMutex
 }
 
+//types of sharded cache collectd, influxdb etc
 //type InputDataV2 map[string]*ShardedInputDataV2
-
-type ShardedInputDataV2 struct {
-	plugin map[string]*Collectd
+//ShardedIncomingCache  ..
+type ShardedIncomingCache struct {
+	plugin map[string]*incoming.Interface
 	lock   *sync.RWMutex
 }
 
-func NewInputDataV2() InputDataV2 {
-	return InputDataV2{
-		hosts: make(map[string]*ShardedInputDataV2),
+//IncomingCache   .. .
+func NewCache() IncomingCache {
+	return IncomingCache{
+		hosts: make(map[string]*ShardedIncomingCache),
 		lock:  new(sync.RWMutex),
 	}
-
 }
-func NewShardedInputDataV2() *ShardedInputDataV2 {
-	return &ShardedInputDataV2{
-		plugin: make(map[string]*Collectd),
+
+//NewShardedIncomingCache   .
+func NewShardedIncomingCache() *ShardedIncomingCache {
+	return &ShardedIncomingCache{
+		plugin: make(map[string]*incoming.Interface),
 		lock:   new(sync.RWMutex),
 	}
 }
-func (i InputDataV2) Put(hostname string) {
-	//mutex.Lock()
+
+//PUT   ..
+func (i IncomingCache) Put(key string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	i.hosts[hostname] = NewShardedInputDataV2()
-	//i.hosts[hostname] = nil
-	//mutex.UnLock()
+	i.hosts[key] = NewShardedIncomingCache()
 }
+
 //GetHosts  Get All hosts
-func (i InputDataV2) GetHosts() map[string]*ShardedInputDataV2{
-	//mutex.Lock()
+func (i IncomingCache) GetHosts() map[string]*ShardedIncomingCache {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	return i.hosts
-	//i.hosts[hostname] = nil
-	//mutex.UnLock()
 }
 
 //GetShard  ..
-func (i InputDataV2) GetShard(hostname string) *ShardedInputDataV2 {
+func (i IncomingCache) GetShard(key string) *ShardedIncomingCache {
 	//GetShard .... add shard
 	//i.lock.Lock()
-	if i.hosts[hostname] == nil {
-		i.Put(hostname)
+	if i.hosts[key] == nil {
+		i.Put(key)
 	}
 
-	return i.hosts[hostname]
+	return i.hosts[key]
 
 }
 
 //GetCollectD   ..
-func (shard *ShardedInputDataV2) GetCollectD(pluginname string) Collectd {
+func (shard *ShardedIncomingCache) GetData(pluginname string) incoming.Interface {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-	return *shard.plugin[pluginname]
+	return shard.plugin[pluginname]
 }
 
 //Size no of plugin per shard
-func (i InputDataV2) Size() int {
+func (i IncomingCache) Size() int {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 	return len(i.hosts)
@@ -84,86 +89,67 @@ func (i InputDataV2) Size() int {
 }
 
 //Size no of plugin per shard
-func (shard *ShardedInputDataV2) Size() int {
+func (shard *ShardedIncomingCache) Size() int {
 	shard.lock.RLock()
 	defer shard.lock.RUnlock()
 	return len(shard.plugin)
 
 }
 
-//SetCollectD ...
-func (shard *ShardedInputDataV2) SetCollectD(collectd Collectd) {
+//SetData
+func (shard *ShardedIncomingCache) SetData(data interface{}) error {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-
-	if shard.plugin[collectd.Plugin] == nil {
-		shard.plugin[collectd.Plugin] = &Collectd{}
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		shard.plugin[collectd.Plugin].Interval = collectd.Interval
-		shard.plugin[collectd.Plugin].Host = collectd.Host
-		shard.plugin[collectd.Plugin].Plugin = collectd.Plugin
-		shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
-		shard.plugin[collectd.Plugin].Type = collectd.Type
-		shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-		shard.plugin[collectd.Plugin].SetNew(true)
-	} else {
-		shard.plugin[collectd.Plugin].Values = collectd.Values
-		shard.plugin[collectd.Plugin].Dsnames = collectd.Dsnames
-		shard.plugin[collectd.Plugin].Dstypes = collectd.Dstypes
-		shard.plugin[collectd.Plugin].Time = collectd.Time
-		if shard.plugin[collectd.Plugin].Plugin_instance != collectd.Plugin_instance {
-			shard.plugin[collectd.Plugin].Plugin_instance = collectd.Plugin_instance
+  if collectd, ok := data.(incoming.Collectd); ok {
+		shard.lock.Lock()
+		defer shard.lock.Unlock()
+		if shard.plugin[collectd.GetName()] == nil {
+				shard.plugin[collectd.GetName()] =*incoming.CreateNewCollectd()
 		}
-		if shard.plugin[collectd.Plugin].Type != collectd.Type {
-			shard.plugin[collectd.Plugin].Type = collectd.Type
-		}
-		if shard.plugin[collectd.Plugin].Type_instance != collectd.Type_instance {
-			shard.plugin[collectd.Plugin].Type_instance = collectd.Type_instance
-		}
-		shard.plugin[collectd.Plugin].SetNew(true)
+		 shard.plugin[collectd.GetName()].SetData(data)
+		 return nil
+	}else{
+    return errors.New("unknow data type while setting data")
 	}
-	//log.Printf("sharded  %v\n",shard.plugin[collectd.Plugin])
+
 
 }
 
 //CacheServer   ..
 type CacheServer struct {
-	cache InputDataV2
-	ch    chan *inputData
+	cache IncomingCache
+	ch    chan Incoming
 }
 
 //GetCache  Get All hosts
-func (c *CacheServer) GetCache() *InputDataV2{
+func (c *CacheServer) GetCache() *IncomingCache {
 	return &c.cache
-
 }
 
-
-
 //NewCacheServer   ...
-func NewCacheServer() *CacheServer {
-
+func NewCacheServer(cacheType incoming.IncomingDataType) *CacheServer {
 	server := &CacheServer{
-		cache: NewInputDataV2(),
-		ch:    make(chan *inputData),
+		cache: NewCache(),
+		ch:    make(chan Incoming),
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
 	return server
 }
 
-func (s *CacheServer) Put(collectd Collectd) {
-		s.ch <- &inputData{collectd: collectd}
+func (s *CacheServer) Put(data interface{}) {
+	if collectd, ok := data.(incoming.Collectd); ok {
+		s.ch <- Incoming{data: collectd}
+	}
+
 }
 
 //GetNewMetric   generate Prometheus metrics
-func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
+func (shard *ShardedIncomingCache) GetNewMetric(ch chan<- prometheus.Metric) {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-	for _, collectd := range shard.plugin {
+	for _, incomingInterface := range shard.plugin {
+		if collectd, ok := incomingInterface.(incoming.Collectd); ok {
 		if collectd.ISNew() {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
@@ -176,6 +162,7 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 
 				ch <- m
 			}
+		}
 		}
 	}
 }
@@ -202,6 +189,44 @@ func (s *CacheServer) loop() {
 		}*/
 	}
 
-	// Handle the command
+}
 
+
+//GenrateSampleData
+func (cs *CacheServer)GenrateSampleData(key string, datacount int, jsonString string,datatype interface{}) {
+	//100 plugins
+	for j := 0; j < datacount; j++ {
+		var pluginname = fmt.Sprintf("%s_%d", "plugin_name", j)
+		go func() {
+      switch datatype.(Type) {
+      case incoming.Collectd:
+        data=datatype.(incoming.Collectd).GenrateSampleData(key,pluginname,jsonstring)
+        c.Host = hostname
+  			c.Plugin = pluginname
+  			c.Type = pluginname
+  			c.Plugin_instance = pluginname
+  			c.Dstypes[0] = "gauge"
+  			c.Dstypes[1] = "gauge"
+  			c.Dsnames[0] = "value1"
+  			c.Dsnames[1] = "value2"
+  			c.Values[0] = rand.Float64()
+  			c.Values[1] = rand.Float64()
+  			c.Time = float64((time.Now().UnixNano())) / 1000000
+
+      }
+			c := incoming.ParseInputJSON(json)
+			c.Host = hostname
+			c.Plugin = pluginname
+			c.Type = pluginname
+			c.Plugin_instance = pluginname
+			c.Dstypes[0] = "gauge"
+			c.Dstypes[1] = "gauge"
+			c.Dsnames[0] = "value1"
+			c.Dsnames[1] = "value2"
+			c.Values[0] = rand.Float64()
+			c.Values[1] = rand.Float64()
+			c.Time = float64((time.Now().UnixNano())) / 1000000
+			cs.Put(*c)
+		}()
+	}
 }
