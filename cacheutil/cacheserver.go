@@ -165,21 +165,24 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	for _, collectd := range shard.plugin {
-    log.Printf("newMetric: %#v", collectd)
+
 		if collectd.ISNew() {
 			collectd.SetNew(false)
 			for index := range collectd.Values {
 				//fmt.Printf("Before new metric %v\n", collectd)
 				m, err := NewMetric(*collectd, index)
+        log.Printf("Generated new Meteric: %#v\n", m)
 				if err != nil {
 
-					log.Printf("newMetric: %v", err)
+					log.Printf("newMetric: %v\n", err)
 					continue
 				}
 
 				ch <- m
 			}
-		}
+		}else{
+      log.Println("Skipping old Meteric")
+    }
 	}
 }
 func (s *CacheServer) loop() {
