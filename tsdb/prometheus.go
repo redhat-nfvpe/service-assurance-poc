@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"github.com/prometheus/client_golang/prometheus"
   "github.com/aneeshkp/service-assurance-goclient/incoming"
-	"log"
+	
 )
 
 var (
@@ -38,7 +38,7 @@ func NewCollectdMetric(collectd incoming.Collectd, index int) (prometheus.Metric
   for key,value := range labels{
       plabels[key]=value
   }
-	
+
 	help := fmt.Sprintf("Service Assurance exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
 		collectd.Plugin, collectd.Type, collectd.Dstypes[index], collectd.DSName(index))
   desc:=prometheus.NewDesc(collectd.GetMetricName(index),help, []string{},plabels)
