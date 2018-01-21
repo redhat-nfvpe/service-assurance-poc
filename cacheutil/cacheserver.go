@@ -1,17 +1,20 @@
 package cacheutil
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-  "github.com/aneeshkp/service-assurance-goclient/incoming"
+	"github.com/aneeshkp/service-assurance-goclient/incoming"
 	"github.com/aneeshkp/service-assurance-goclient/tsdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"sync"
+
+
 	//"errors"
 	"fmt"
 )
 
 var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
+
 /****************************************/
 //IncomingBuffer  this is inut data send to cache server
 //IncomingBuffer  ..its of type collectd or anything else
@@ -105,21 +108,20 @@ func (shard *ShardedIncomingDataCache) SetData(data incoming.IncomingDataInterfa
 	defer shard.lock.Unlock()
 	if shard.plugin[data.GetItemKey()] == nil {
 		//TODO: change this to more generic later
-			shard.plugin[data.GetItemKey()] =incoming.NewInComing(incoming.COLLECTD)
+		shard.plugin[data.GetItemKey()] = incoming.NewInComing(incoming.COLLECTD)
 	}
-	shard.plugin[data.GetItemKey()].SetData(data)
+	collectd:=shard.plugin[data.GetItemKey()]
+	collectd.SetData(data)
 	return nil
 
-  //return errors.New("unknow data type while setting data")
-
-
+	//return errors.New("unknow data type while setting data")
 
 }
 
 //CacheServer   ..
 type CacheServer struct {
 	cache IncomingDataCache
-	ch    chan IncomingBuffer
+	ch    chan *IncomingBuffer
 }
 
 //GetCache  Get All hosts
@@ -128,10 +130,10 @@ func (cs *CacheServer) GetCache() *IncomingDataCache {
 }
 
 //NewCacheServer   ...
-func NewCacheServer(cacheType incoming.IncomingDataType) *CacheServer {
+func NewCacheServer() *CacheServer {
 	server := &CacheServer{
 		cache: NewCache(),
-		ch:    make(chan IncomingBuffer),
+		ch:    make(chan *IncomingBuffer),
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
@@ -140,9 +142,16 @@ func NewCacheServer(cacheType incoming.IncomingDataType) *CacheServer {
 
 //Put   ..
 func (cs *CacheServer) Put(incomingData incoming.IncomingDataInterface) {
-	//if collectd, ok := data.(*incoming.Collectd); ok {
-		cs.ch <- IncomingBuffer{data: incomingData}
-	//}
+	var buffer *IncomingBuffer
+	select {
+	case buffer=<-freeList:
+		//go one from buffer
+	default:
+			buffer=new(IncomingBuffer)
+	}
+	buffer.data=incomingData
+	cs.ch <-buffer
+
 
 }
 
@@ -152,23 +161,23 @@ func (shard *ShardedIncomingDataCache) GetNewMetric(ch chan<- prometheus.Metric)
 	defer shard.lock.Unlock()
 	for _, IncomingDataInterface := range shard.plugin {
 		if collectd, ok := IncomingDataInterface.(*incoming.Collectd); ok {
-		if collectd.ISNew() {
-			collectd.SetNew(false)
-			for index := range collectd.Values {
-				//fmt.Printf("Before new metric %v\n", collectd)
-				m, err := tsdb.NewCollectdMetric(*collectd, index)
-				if err != nil {
-					log.Printf("newMetric: %v", err)
-					continue
-				}
+			if collectd.ISNew() {
+				collectd.SetNew(false)
+				for index := range collectd.Values {
 
-				ch <- m
+					m, err := tsdb.NewCollectdMetric(*collectd, index)
+					if err != nil {
+						log.Printf("newMetric: %v", err)
+						continue
+					}
+           
+					ch <- m
+				}
 			}
-		}
 		}
 	}
 }
-func (cs CacheServer) close(){
+func (cs CacheServer) close() {
 	<-quitCacheServerCh
 	close(quitCacheServerCh)
 }
@@ -177,15 +186,16 @@ func (cs CacheServer) loop() {
 	// amongst other things
 LOOP:
 	for {
+		// Reuse buffer if there's room.
 		buffer := <-cs.ch
 		shard := cs.cache.GetShard(buffer.data.GetKey())
 		shard.SetData(buffer.data)
-		// Reuse buffer if there's room.
 		select {
-		case freeList <- &buffer:
+
+			case freeList <-buffer:
 			// Buffer on free list; nothing more to do.
-		case <-quitCacheServerCh:
-			  break LOOP
+			case <-quitCacheServerCh:
+				break LOOP
 		default:
 			// Free list full, just carry on.
 		}
@@ -200,20 +210,17 @@ LOOP:
 
 }
 
-
 //GenrateSampleData  ....
-func (cs *CacheServer)GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
+func (cs * CacheServer)GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
 	//100 plugins
-	var hostwaitgroup sync.WaitGroup
-	hostwaitgroup.Add(itemCount)
 	for j := 0; j < itemCount; j++ {
 		var pluginname = fmt.Sprintf("%s_%d", "plugin_name_", j)
-		go func(pluginname string ) {
-			defer hostwaitgroup.Done()
-			 var newSample incoming.IncomingDataInterface
-			 newSample=datatype.GenerateSampleData(key, pluginname)
-       cs.Put(newSample)
-		}(pluginname)
+		//. defer wg.Done()
+		var newSample incoming.IncomingDataInterface
+		newSample = datatype.GenerateSampleData(key, pluginname)
+		cs.Put(newSample)
+
 	}
-	hostwaitgroup.Wait()
+
+
 }

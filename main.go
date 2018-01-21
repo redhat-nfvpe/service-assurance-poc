@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/aneeshkp/service-assurance-goclient/amqp"
 	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	"github.com/aneeshkp/service-assurance-goclient/incoming"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"net/http"
@@ -28,7 +29,7 @@ var (
 
 /*************** HTTP HANDLER***********************/
 type cacheHandler struct {
-	cache *cacheutil.InputDataV2
+	cache *cacheutil.IncomingDataCache
 }
 
 /*func (h *cacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -96,16 +97,17 @@ func main() {
 		os.Exit(1)
 	}
 	//Cache sever to process and serve the exporter
-	var cacheserver = cacheutil.NewCacheServer()
+	var cacheServer *cacheutil.CacheServer
+	cacheServer = cacheutil.NewCacheServer()
 
-	myHandler := &cacheHandler{cache: cacheserver.GetCache()}
+	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
 
 	prometheus.MustRegister(myHandler)
 	http.Handle("/metrics", prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
              <head><title>Collectd Exporter</title></head>
-             <body>
+             <body>cacheutil
              <h1>Collectd Exporter</h1>
              <p><a href='/metrics'>Metrics</a></p>
              </body>
@@ -124,7 +126,6 @@ func main() {
 				*f_iterations=9999999
 			}
 			var hostwaitgroup sync.WaitGroup
-			var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
 			fmt.Printf("Test data  will run for %d times ",*f_iterations)
 			for times := 1; times <= *f_iterations; times++ {
 				hostwaitgroup.Add(*f_hosts)
@@ -132,7 +133,8 @@ func main() {
 					go func(host_id int) {
 						defer hostwaitgroup.Done()
 						var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
-						go cacheutil.GenrateSampleData(hostname, *f_plugins, jsondata, cacheserver)
+						incomingType:=incoming.NewInComing(incoming.COLLECTD)
+						go cacheServer.GenrateSampleData(hostname, *f_plugins,incomingType)
 					}(hosts)
 
 				}
@@ -146,11 +148,13 @@ func main() {
 		var amqpurl = fmt.Sprintf("amqp://%s",*f_amqpurl)
 		var amqpServer *amqplistener.AMQPServer
 		amqpServer = amqplistener.NewAMQPServer(amqpurl, true, *f_count, notifier)
+
 		for {
 				data := <-amqpServer.GetNotifier()
 				//fmt.Printf("%v",data)
-				c := cacheutil.ParseCollectdJSON(data)
-				cacheserver.Put(*c)
+				incomingType:=incoming.NewInComing(incoming.COLLECTD)
+				incomingType.ParseInputJSON(data)
+				cacheServer.Put(incomingType)
 		}
 	}
 //TO DO: to close cache server on keyboard interrupt

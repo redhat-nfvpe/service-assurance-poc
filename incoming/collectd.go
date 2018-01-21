@@ -95,6 +95,7 @@ func (c *Collectd) SetData(data IncomingDataInterface) {
 			c.Type_instance = collectd.Type_instance
 		}
 		c.SetNew(true)
+
 	}
 }
 

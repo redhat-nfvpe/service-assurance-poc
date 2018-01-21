@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	"github.com/aneeshkp/service-assurance-goclient/incoming"
 
 	"sync"
 	"testing"
@@ -15,7 +16,7 @@ func TestPut(t *testing.T) {
 
 	var hostwaitgroup sync.WaitGroup
 
-	var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
+
 	for times := 1; times <= noofiteration; times++ {
 		hostwaitgroup.Add(noofhosts)
 		for hosts := 0; hosts < noofhosts; hosts++ {
@@ -26,7 +27,10 @@ func TestPut(t *testing.T) {
 				//for each host make it on go routine
 				var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
 				//fmt.Printf("Iteration %d hostname %s\n",times,hostname)
-				go cacheutil.GenrateSampleData(hostname, noofpluginperhosts, jsondata, cacheserver)
+
+				collectd := incoming.NewInComing(incoming.COLLECTD)
+				cacheserver.GenrateSampleData(hostname, noofpluginperhosts,collectd)
+
 			}(hosts)
 
 		}
