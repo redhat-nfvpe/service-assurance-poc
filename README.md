@@ -24,13 +24,16 @@
 **From Barometer User guide**:
 Read barometer docker user guide [barometer docker user guide](http://docs.opnfv.org/en/latest/submodules/barometer/docs/release/userguide/docker.userguide.html)
 
-**Installing barometer collectd container _Without AMQP plugin_**
+**Installing barometer collectd container WITHOUT AMQP plugin**
 - $ git clone https://gerrit.opnfv.org/gerrit/barometer
 - $ cd barometer/docker/barometer-collectd
 - $ sudo docker build -t opnfv/barometer-collectd --build-arg http_proxy=`echo $http_proxy` \
   --build-arg https_proxy=`echo $https_proxy` -f Dockerfile .
+  
+**Installing barometer collectd container WITH AMQP plugin**
 
-**Applying AMQP1.0 plugin patch to build docker images **
+**Applying AMQP1.0 plugin patch to build docker images**
+
 In order to apply AMQP1.0 plugin as patch for the docker image before building. I copied the project to public github and made following changes to the project
 
 For reference see below. You can skip this section to "Build with AMQP1.0 plugin"
