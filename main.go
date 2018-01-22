@@ -39,7 +39,6 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	for _, plugin := range c.cache.GetHosts() {
 		//fmt.Fprintln(w, hostname)
-		log.Printf("%d\n", plugin.Size())
 		plugin.GetNewMetric(ch)
 	}
 
