@@ -151,7 +151,13 @@ func (c Collectd) GetMetricName(index int) string {
 
 //GetItemKey  ...
 func (c Collectd) GetItemKey() string {
-	return c.Plugin
+	var name string
+	if c.Plugin == c.Type {
+		name = c.Type
+	} else {
+		name = c.Plugin + "_" + c.Type
+	}
+	return name
 }
 
 //GenerateSampleData  ...

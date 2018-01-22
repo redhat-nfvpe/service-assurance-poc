@@ -18,7 +18,7 @@ import (
 var (
 	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "collectd_last_pull_timestamp_seconds",
+			Name: "service_assurance_collectd_last_pull_timestamp_seconds",
 			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
 		},
 	)
@@ -37,6 +37,12 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 //need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
+	for _, plugin := range c.cache.GetHosts() {
+		//fmt.Fprintln(w, hostname)
+		log.Printf("%d\n",plugin.Size())
+		plugin.GetNewMetric(ch)
+	}
+
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
 	ch <- lastPull
 

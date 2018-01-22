@@ -159,7 +159,6 @@ func (shard *ShardedIncomingDataCache) GetNewMetric(ch chan<- prometheus.Metric)
 			if collectd.ISNew() {
 				collectd.SetNew(false)
 				for index := range collectd.Values {
-
 					m, err := tsdb.NewCollectdMetric(*collectd, index)
 					if err != nil {
 						log.Printf("newMetric: %v", err)
@@ -186,7 +185,6 @@ LOOP:
 		shard := cs.cache.GetShard(buffer.data.GetKey())
 		shard.SetData(buffer.data)
 		select {
-
 		case freeList <- buffer:
 		// Buffer on free list; nothing more to do.
 		case <-quitCacheServerCh:
