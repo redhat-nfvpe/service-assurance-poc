@@ -1,9 +1,9 @@
 
 ## Note about github branch
-###  master branch: 
-**master branch only works for collectd and will soon replaced by interface branch.**
-## interface branch: 
- **interface branch is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). This code base uses interface design patterns, allowing to plug in many types of data source(currently under testing)**
+###  collectd branch: 
+**collectd branch only works for collectd and will soon replaced by interface branch.**
+## collectd branch: 
+ **collectd branch is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). This code base uses interface design patterns, allowing to plug in many types of data source(currently under testing)**
 
 
 ## Service Assurance Smart Agent POC
