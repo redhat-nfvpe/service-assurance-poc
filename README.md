@@ -1,4 +1,5 @@
-#Service Assurance Smart Agent
+###### Interface branch is not tightly coupled with collectd datasource, It has the flexibility  to add many different types of input sources(collectd, statsd,fluentd etc ). This code bases uses interface design patterns, allowing to plug in many types of data source(currently under testing)
+######  master branch only works for collectd and will soon replaced by interface branch.
 
 
 ## Service Assurance Smart Agent POC
