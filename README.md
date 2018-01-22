@@ -1,9 +1,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/aneeshkp/service-assurance-goclient)](https://goreportcard.com/report/github.com/aneeshkp/service-assurance-goclient)
 ## Note about github branch
 ###  collectd branch: 
-**collectd branch only works for collectd and will soon replaced by interface branch.**
+**collectd branch only works for collectd .**
 ## master branch: 
- **master branch is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). This code base uses interface design patterns, allowing to plug in many types of data source(currently under testing)**
+ **master branch is working branch.This codse base is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). Implments interface design patterns, allowing to plug in many types of data source(currently under testing)**
 
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
