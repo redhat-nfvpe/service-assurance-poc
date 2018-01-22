@@ -1,4 +1,4 @@
-## Not about github branch
+## Note about github branch
 ###  master branch: 
 **master branch only works for collectd and will soon replaced by interface branch.**
 ## interface branch: 
