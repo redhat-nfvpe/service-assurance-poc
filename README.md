@@ -1,6 +1,3 @@
-#Service Assurance Smart Agent
-
-
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
 - Runnng a SA-Smart Agent Service will start 3 services 
