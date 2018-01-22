@@ -1,11 +1,11 @@
 
 ## Note about github branch
+## Note about github branch
 ###  collectd branch: 
-**collectd branch only works for collectd and will soon replaced by interface branch.**
-## collectd branch: 
- **collectd branch is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). This code base uses interface design patterns, allowing to plug in many types of data source(currently under testing)**
-
-
+**collectd branch only works for collectd .**
+## master branch: 
+ **master branch is working branch.This codse base is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). Implments interface design patterns, allowing to plug in many types of data source**
+ 
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
 - Runnng a SA-Smart Agent Service will start 3 services 
