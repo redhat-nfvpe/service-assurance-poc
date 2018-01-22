@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+//Collectd  ...
 type Collectd struct {
 	Values         []float64
 	Dstypes        []string
