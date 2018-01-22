@@ -38,7 +38,7 @@ func NewCollectdMetric(collectd incoming.Collectd, index int) (prometheus.Metric
 
 	help := fmt.Sprintf("Service Assurance exporter: '%s' Type: '%s' Dstype: '%s' Dsname: '%s'",
 		collectd.Plugin, collectd.Type, collectd.Dstypes[index], collectd.DSName(index))
-	metricName:=metricNameRe.ReplaceAllString(collectd.GetMetricName(index), "_")
+	metricName := metricNameRe.ReplaceAllString(collectd.GetMetricName(index), "_")
 	desc := prometheus.NewDesc(metricName, help, []string{}, plabels)
 	return prometheus.NewConstMetric(desc, valueType, value)
 }

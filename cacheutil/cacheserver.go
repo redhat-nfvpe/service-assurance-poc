@@ -98,8 +98,7 @@ func (shard *ShardedIncomingDataCache) Size() int {
 
 }
 
-//TODO : add generic
-//SetData
+//SetData  TODO : add generic
 func (shard *ShardedIncomingDataCache) SetData(data incoming.IncomingDataInterface) error {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()

@@ -69,6 +69,8 @@ func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string
 	go server.start()
 	return server
 }
+
+//GetNotifier  Get notifier
 func (s *AMQPServer) GetNotifier() chan string {
 	return s.notifier
 }

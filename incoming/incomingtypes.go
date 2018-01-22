@@ -1,6 +1,6 @@
 package incoming
 
-//IncomingDataInterface
+//IncomingDataInterface   ...
 type IncomingDataInterface interface {
 	GetName() string
 	SetData(data IncomingDataInterface)

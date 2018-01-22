@@ -21,7 +21,7 @@ func TestCacheServer(t *testing.T) {
 }
 
 func TestCacheServer2(t *testing.T) {
-	var pluginCount  = 10
+	var pluginCount = 10
 	var hostname = "hostname"
 	//	var hostCount=1
 	//	var freeListToCollectSample = make(chan *IncomingBuffer, 100)

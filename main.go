@@ -28,6 +28,7 @@ var (
 type cacheHandler struct {
 	cache *cacheutil.IncomingDataCache
 }
+
 // Describe implements prometheus.Collector.
 func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 	ch <- lastPull.Desc()
