@@ -10,13 +10,12 @@ import (
 )
 
 var (
-	metric_name_re = regexp.MustCompile("[^a-zA-Z0-9_:]")
+	 metricNameRe  = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
-
+//PrometehusCollector   ..
 type PrometehusCollector map[string]*ShardedPrometehusCollector
 
-/*ShardedPluginCache  ,sub types with plugin name fo host has values
-ShardedPluginCache,   map[plugin_name] values are pointer to plugin*/
+//ShardedPrometehusCollector ...  ,sub types with plugin name fo host has values
 type ShardedPrometehusCollector struct {
 	metric map[string]*prometheus.Metric
 	lock   *sync.RWMutex
@@ -24,12 +23,12 @@ type ShardedPrometehusCollector struct {
 
 
 
-//NewCache   ...
+//NewPrometehusCollector   ...
 func NewPrometehusCollector() PrometehusCollector {
 	return make(PrometehusCollector)
 }
 
-//NewShardedPluginCache  . create new  sharded BufferCache
+//NewShardedPrometehusCollector  . create new  sharded BufferCache
 func NewShardedPrometehusCollector() *ShardedPrometehusCollector {
 	return &ShardedPrometehusCollector{
 		metric: make(map[string]*prometheus.Metric),
@@ -46,6 +45,7 @@ func (c PrometehusCollector) Put(hostname string) (shard *ShardedPrometehusColle
 func (c *PrometehusCollector) Get(hostname string) (shard *ShardedPrometehusCollector) {
 	return c.GetShard(hostname)
 }
+//GetMetrics  ...
 func (shard *ShardedPrometehusCollector) GetMetrics(hostname string) (metrics map[string]*prometheus.Metric) {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
@@ -84,6 +84,7 @@ func (shard *ShardedPrometehusCollector) Put(pluginname string, metric prometheu
 	shard.metric[pluginname] = &metric
 
 }
+//Get  ...
 func (shard ShardedPrometehusCollector) Get(pluginname string) prometheus.Metric {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
@@ -108,7 +109,7 @@ func (shard *ShardedPrometehusCollector) Size() int {
 }
 
 
-
+//NewName  ....
 func NewName(vl Collectd, index int) string {
 	var name string
 	if vl.Plugin == vl.Type {
@@ -126,20 +127,20 @@ func NewName(vl Collectd, index int) string {
 		name += "_total"
 	}
 
-	return metric_name_re.ReplaceAllString(name, "_")
+	return metricNameRe.ReplaceAllString(name, "_")
 }
 
 // newLabels converts the plugin and type instance of vl to a set of prometheus.Labels.
 func newLabels(vl Collectd) prometheus.Labels {
 	labels := prometheus.Labels{}
-	if vl.Plugin_instance != "" {
-		labels[vl.Plugin] = vl.Plugin_instance
+	if vl.PluginInstance != "" {
+		labels[vl.Plugin] = vl.PluginInstance
 	}
-	if vl.Type_instance != "" {
-		if vl.Plugin_instance == "" {
-			labels[vl.Plugin] = vl.Type_instance
+	if vl.TypeInstance != "" {
+		if vl.PluginInstance == "" {
+			labels[vl.Plugin] = vl.TypeInstance
 		} else {
-			labels["type"] = vl.Type_instance
+			labels["type"] = vl.TypeInstance
 		}
 	}
 	labels["instance"] = vl.Host
@@ -155,7 +156,7 @@ func newDesc(vl Collectd, index int) *prometheus.Desc {
 	return prometheus.NewDesc(NewName(vl, index), help, []string{}, newLabels(vl))
 }
 
-// newMetric converts one data source of a value list to a Prometheus metric.
+//NewMetric converts one data source of a value list to a Prometheus metric.
 func NewMetric(vl Collectd, index int) (prometheus.Metric, error) {
 	var value float64
 	var valueType prometheus.ValueType

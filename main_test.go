@@ -15,7 +15,7 @@ func TestPut(t *testing.T) {
 
 	var hostwaitgroup sync.WaitGroup
 
-	var jsondata = cacheutil.GenerateCollectdJson("hostname", "pluginname")
+	var jsondata = cacheutil.GenerateCollectdJSON("hostname", "pluginname")
 	for times := 1; times <= noofiteration; times++ {
 		hostwaitgroup.Add(noofhosts)
 		for hosts := 0; hosts < noofhosts; hosts++ {
