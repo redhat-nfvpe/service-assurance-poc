@@ -1,3 +1,4 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/aneeshkp/service-assurance-goclient)](https://goreportcard.com/report/github.com/aneeshkp/service-assurance-goclient)
 ## Note about github branch
 ###  collectd branch: 
 **collectd branch only works for collectd and will soon replaced by interface branch.**
