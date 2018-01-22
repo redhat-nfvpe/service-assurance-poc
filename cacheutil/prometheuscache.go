@@ -1,7 +1,6 @@
 package cacheutil
 
 import (
-
 	"fmt"
 	"regexp"
 	"sync"
@@ -10,8 +9,9 @@ import (
 )
 
 var (
-	 metricNameRe  = regexp.MustCompile("[^a-zA-Z0-9_:]")
+	metricNameRe = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
+
 //PrometehusCollector   ..
 type PrometehusCollector map[string]*ShardedPrometehusCollector
 
@@ -20,8 +20,6 @@ type ShardedPrometehusCollector struct {
 	metric map[string]*prometheus.Metric
 	lock   *sync.RWMutex
 }
-
-
 
 //NewPrometehusCollector   ...
 func NewPrometehusCollector() PrometehusCollector {
@@ -45,6 +43,7 @@ func (c PrometehusCollector) Put(hostname string) (shard *ShardedPrometehusColle
 func (c *PrometehusCollector) Get(hostname string) (shard *ShardedPrometehusCollector) {
 	return c.GetShard(hostname)
 }
+
 //GetMetrics  ...
 func (shard *ShardedPrometehusCollector) GetMetrics(hostname string) (metrics map[string]*prometheus.Metric) {
 	shard.lock.Lock()
@@ -84,6 +83,7 @@ func (shard *ShardedPrometehusCollector) Put(pluginname string, metric prometheu
 	shard.metric[pluginname] = &metric
 
 }
+
 //Get  ...
 func (shard ShardedPrometehusCollector) Get(pluginname string) prometheus.Metric {
 	shard.lock.Lock()
@@ -107,7 +107,6 @@ func (shard *ShardedPrometehusCollector) Size() int {
 	defer shard.lock.RUnlock()
 	return len(shard.metric)
 }
-
 
 //NewName  ....
 func NewName(vl Collectd, index int) string {

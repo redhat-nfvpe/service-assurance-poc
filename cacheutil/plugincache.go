@@ -118,6 +118,7 @@ func (shard *ShardedPluginCache) Put(pluginname string, plugin Plugin) {
 	shard.Plugins[pluginname].Put(plugin)
 
 }
+
 //GetPluginByName   ..
 func (shard *ShardedPluginCache) GetPluginByName(pluginname string) *Plugin {
 	shard.lock.Lock()
@@ -131,6 +132,7 @@ func (shard *ShardedPluginCache) GetPluginByName(pluginname string) *Plugin {
 	return shard.Plugins[pluginname]
 
 }
+
 //UpdateLabel  ...
 func (p *Plugin) UpdateLabel(labels map[string]string) {
 	p.lock.Lock()
@@ -139,6 +141,7 @@ func (p *Plugin) UpdateLabel(labels map[string]string) {
 		p.Labels.Items[key] = value
 	}
 }
+
 //UpdateDataSource   ....
 func (p *Plugin) UpdateDataSource(datasource map[string]float64) {
 	p.lock.Lock()

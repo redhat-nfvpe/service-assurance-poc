@@ -9,17 +9,17 @@ import (
 )
 
 type Collectd struct {
-	Values          []float64
-	Dstypes         []string
-	Dsnames         []string
-	Time            float64
-	Interval        float64
-	Host            string
-	Plugin          string
-	PluginInstance string  `json:"plugin_instance"`
-	Type            string `json:"type"`
-	TypeInstance   string  `json:"type_instance"`
-	new             bool
+	Values         []float64
+	Dstypes        []string
+	Dsnames        []string
+	Time           float64
+	Interval       float64
+	Host           string
+	Plugin         string
+	PluginInstance string `json:"plugin_instance"`
+	Type           string `json:"type"`
+	TypeInstance   string `json:"type_instance"`
+	new            bool
 }
 
 //GenrateSampleData   ..
@@ -77,6 +77,7 @@ func ParseCollectdByte(amqpCollectd []byte) *Collectd {
 func (c *Collectd) SetNew(new bool) {
 	c.new = new
 }
+
 //ISNew    .
 func (c *Collectd) ISNew() bool {
 	return c.new

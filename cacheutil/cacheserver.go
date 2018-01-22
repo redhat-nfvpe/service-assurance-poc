@@ -20,12 +20,12 @@ type InputDataV2 struct {
 	lock  *sync.RWMutex
 }
 
-
 //ShardedInputDataV2 ...
 type ShardedInputDataV2 struct {
 	plugin map[string]*Collectd
 	lock   *sync.RWMutex
 }
+
 //NewInputDataV2 ...
 func NewInputDataV2() InputDataV2 {
 	return InputDataV2{
@@ -34,6 +34,7 @@ func NewInputDataV2() InputDataV2 {
 	}
 
 }
+
 //NewShardedInputDataV2 ...
 func NewShardedInputDataV2() *ShardedInputDataV2 {
 	return &ShardedInputDataV2{
@@ -41,6 +42,7 @@ func NewShardedInputDataV2() *ShardedInputDataV2 {
 		lock:   new(sync.RWMutex),
 	}
 }
+
 //Put   ..
 func (i InputDataV2) Put(hostname string) {
 	//mutex.Lock()
@@ -189,6 +191,7 @@ func (shard *ShardedInputDataV2) GetNewMetric(ch chan<- prometheus.Metric) {
 		}
 	}
 }
+
 //loop   .
 func (cs *CacheServer) loop() {
 	// The built-in "range" clause can iterate over channels,
@@ -205,6 +208,5 @@ func (cs *CacheServer) loop() {
 			// Free list full, just carry on.
 		}
 	}
-
 
 }
