@@ -27,7 +27,7 @@ import (
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
 	"strings"
-//  "reflect"
+	//  "reflect"
 )
 
 // Usage and command-line flags
@@ -131,15 +131,15 @@ func (s *AMQPServer) start() {
 		}
 	}()
 	//outside go routin reciveve and process
-  //var firstmsg=0
+	//var firstmsg=0
 	for {
 		m := <-messages
-    //fmt.Println(reflect.TypeOf( m.Body()))
+		//fmt.Println(reflect.TypeOf( m.Body()))
 		//fmt.Printf("%v\n", m.Body())
-    amqpBinary:=m.Body().(amqp.Binary)
-    //fmt.Printf("The Go String%s\n", amqpBinary.String())
+		amqpBinary := m.Body().(amqp.Binary)
+		//fmt.Printf("The Go String%s\n", amqpBinary.String())
 
-    s.notifier <-  amqpBinary.String()
+		s.notifier <- amqpBinary.String()
 	}
 
 	//wait.Wait() // Wait for all goroutines to finish.

@@ -7,7 +7,6 @@ import (
 	"log"
 	"sync"
 
-
 	//"errors"
 	"fmt"
 )
@@ -15,7 +14,6 @@ import (
 var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
 
-/****************************************/
 //IncomingBuffer  this is inut data send to cache server
 //IncomingBuffer  ..its of type collectd or anything else
 type IncomingBuffer struct {
@@ -28,15 +26,14 @@ type IncomingDataCache struct {
 	lock  *sync.RWMutex
 }
 
-//types of sharded cache collectd, influxdb etc
-//type InputDataV2 map[string]*ShardedInputDataV2
+//ShardedIncomingDataCache types of sharded cache collectd, influxdb etc
 //ShardedIncomingDataCache  ..
 type ShardedIncomingDataCache struct {
 	plugin map[string]incoming.IncomingDataInterface
 	lock   *sync.RWMutex
 }
 
-//IncomingDataCache   .. .
+//NewCache   .. .
 func NewCache() IncomingDataCache {
 	return IncomingDataCache{
 		hosts: make(map[string]*ShardedIncomingDataCache),
@@ -52,7 +49,7 @@ func NewShardedIncomingDataCache() *ShardedIncomingDataCache {
 	}
 }
 
-//PUT   ..
+//Put   ..
 func (i IncomingDataCache) Put(key string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
@@ -68,7 +65,7 @@ func (i IncomingDataCache) GetHosts() map[string]*ShardedIncomingDataCache {
 
 //GetShard  ..
 func (i IncomingDataCache) GetShard(key string) *ShardedIncomingDataCache {
-	//GetShard .... add shard
+	//GetShard .... add shardGetCollectD
 	//i.lock.Lock()
 	if i.hosts[key] == nil {
 		i.Put(key)
@@ -78,7 +75,7 @@ func (i IncomingDataCache) GetShard(key string) *ShardedIncomingDataCache {
 
 }
 
-//GetCollectD   ..
+//GetData   ..
 func (shard *ShardedIncomingDataCache) GetData(pluginname string) incoming.IncomingDataInterface {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
@@ -110,7 +107,7 @@ func (shard *ShardedIncomingDataCache) SetData(data incoming.IncomingDataInterfa
 		//TODO: change this to more generic later
 		shard.plugin[data.GetItemKey()] = incoming.NewInComing(incoming.COLLECTD)
 	}
-	collectd:=shard.plugin[data.GetItemKey()]
+	collectd := shard.plugin[data.GetItemKey()]
 	collectd.SetData(data)
 	return nil
 
@@ -144,14 +141,13 @@ func NewCacheServer() *CacheServer {
 func (cs *CacheServer) Put(incomingData incoming.IncomingDataInterface) {
 	var buffer *IncomingBuffer
 	select {
-	case buffer=<-freeList:
+	case buffer = <-freeList:
 		//go one from buffer
 	default:
-			buffer=new(IncomingBuffer)
+		buffer = new(IncomingBuffer)
 	}
-	buffer.data=incomingData
-	cs.ch <-buffer
-
+	buffer.data = incomingData
+	cs.ch <- buffer
 
 }
 
@@ -170,7 +166,7 @@ func (shard *ShardedIncomingDataCache) GetNewMetric(ch chan<- prometheus.Metric)
 						log.Printf("newMetric: %v", err)
 						continue
 					}
-           
+
 					ch <- m
 				}
 			}
@@ -192,10 +188,10 @@ LOOP:
 		shard.SetData(buffer.data)
 		select {
 
-			case freeList <-buffer:
-			// Buffer on free list; nothing more to do.
-			case <-quitCacheServerCh:
-				break LOOP
+		case freeList <- buffer:
+		// Buffer on free list; nothing more to do.
+		case <-quitCacheServerCh:
+			break LOOP
 		default:
 			// Free list full, just carry on.
 		}
@@ -211,7 +207,7 @@ LOOP:
 }
 
 //GenrateSampleData  ....
-func (cs * CacheServer)GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
+func (cs *CacheServer) GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
 	//100 plugins
 	for j := 0; j < itemCount; j++ {
 		var pluginname = fmt.Sprintf("%s_%d", "plugin_name_", j)
@@ -221,6 +217,5 @@ func (cs * CacheServer)GenrateSampleData(key string, itemCount int, datatype inc
 		cs.Put(newSample)
 
 	}
-
 
 }
