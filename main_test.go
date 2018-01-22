@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 
 	"sync"
 	"testing"

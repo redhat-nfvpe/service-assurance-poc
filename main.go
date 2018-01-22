@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/aneeshkp/service-assurance-goclient/amqp"
-	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
+	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
+	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"flag"

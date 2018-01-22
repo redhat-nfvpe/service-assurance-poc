@@ -1,0 +1,13 @@
+package: github.com/redhat-nfvpe/service-assurance-poc
+import:
+- package: github.com/prometheus/client_golang
+  subpackages:
+  - prometheus
+- package: github.com/redhat-nfvpe/service-assurance-poc
+  subpackages:
+  - amqp
+  - cacheutil
+- package: qpid.apache.org
+  subpackages:
+  - amqp
+  - electron

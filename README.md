@@ -1,15 +1,15 @@
 
 ## Note about github branch
 ## Note about github branch
-###  collectd branch: 
+###  collectd branch:
 **collectd branch only works for collectd .**
-## master branch: 
+## master branch:
  **master branch is working branch.This codse base is not tightly coupled with single datasource, It has the flexibility to add many different types of input sources(collectd, statsd,fluentd etc ). Implments interface design patterns, allowing to plug in many types of data source**
- 
+
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
-- Runnng a SA-Smart Agent Service will start 3 services 
-	- qpid router listener, to consume all incoming collectd json 
+- Runnng a SA-Smart Agent Service will start 3 services
+	- qpid router listener, to consume all incoming collectd json
 	- http server to expose metrics from collectd for Prometheus to scrape.
 	- CacheServer to cach all incoming data from amqp1.0 plugin
 ##### Requirment.
@@ -30,7 +30,7 @@ Read barometer docker user guide [barometer docker user guide](http://docs.opnfv
 - $ cd barometer/docker/barometer-collectd
 - $ sudo docker build -t opnfv/barometer-collectd --build-arg http_proxy=`echo $http_proxy` \
   --build-arg https_proxy=`echo $https_proxy` -f Dockerfile .
-  
+
 **Applying AMQP1.0 plugin patch to build docker images **
 In order to apply AMQP1.0 plugin as patch for the docker image before building. I copied the project to public github and made following changes to the project
 
@@ -40,7 +40,7 @@ For reference see below. You can skip this section to "Build with AMQP1.0 plugin
   +COLLECTD_AMQP1_PATCH_URL ?= https://github.com/collectd/collectd/pull/2618.patch
   +AMQP1_PATCH ?= 2619
 ```
-	  
+
 **:scream://Didn’t add qpid proton link. Instead of building the pakcage, choose to do yum install.**
 
 **:thought_balloon:During testing qpid proton verson 0.18.1 wast not available in release repo . Hence used test repo**
@@ -49,7 +49,7 @@ For reference see below. You can skip this section to "Build with AMQP1.0 plugin
 ```
 $(AT)sudo yum install -y qpid-proton-c-devel-0.18.1-1.el7.x86_64 --enablerepo=epel-testing
 ```
-	
+
 - **Change 3 :https://github.com/aneeshkp/barometer/blob/master/docker/Dockerfile**
 ```
 
@@ -83,9 +83,9 @@ docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.co
 ##### Prometheus Installation
 Read Prometheus installtion [Prometheus installation](https://prometheus.io/docs/prometheus/latest/installation/)
 Set the target in prometheus yml to scrap available metrics port (see Smart Agent Usage for port).
-##### Service Assurance Smart Agent installation 
+##### Service Assurance Smart Agent installation
 ```
-Git clone https://github.com/aneeshkp/service-assurance-goclient.git
+Git clone https://github.com/redhat-nfvpe/service-assurance-poc.git
 Set go environment.
 Follow error message to run "$go get dependencies"
 ```
@@ -94,7 +94,7 @@ Follow error message to run "$go get dependencies"
 
 **For running with AMQP and Prometheus use following option.**
 ```
-$go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry 
+$go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry
 ```
 
 ---
@@ -103,7 +103,7 @@ $go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/
 **Sample Data**
 
 ```
-$go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 
+$go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
 ```
 
 ```
@@ -124,6 +124,3 @@ $go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
     	No of times to run sample data (default 1) -1 for ever. (default 1)
   -usesample
     	Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)
-
-
-
