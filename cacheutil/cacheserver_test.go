@@ -1,7 +1,7 @@
 package cacheutil
 
 import (
-	"github.com/aneeshkp/service-assurance-goclient/incoming"
+	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 
 	//"sync"
 	"testing"

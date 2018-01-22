@@ -1,8 +1,8 @@
 package cacheutil
 
 import (
-	"github.com/aneeshkp/service-assurance-goclient/incoming"
-	"github.com/aneeshkp/service-assurance-goclient/tsdb"
+	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
+	"github.com/redhat-nfvpe/service-assurance-poc/tsdb"
 	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"sync"

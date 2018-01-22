@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/aneeshkp/service-assurance-goclient/cacheutil"
-	"github.com/aneeshkp/service-assurance-goclient/incoming"
+	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
+	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 
 	"sync"
 	"testing"
