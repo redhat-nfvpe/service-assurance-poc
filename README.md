@@ -65,7 +65,32 @@ For reference see below. You can skip this section to "Build with AMQP1.0 plugin
   +COLLECTD_AMQP1_PATCH_URL ?= https://github.com/collectd/collectd/pull/2618.patch
   +AMQP1_PATCH ?= 2619
 ```
+**Collectd configuration**
 
+```
+LoadPlugin amqp1
+<Plugin amqp1>
+  <Transport "name">
+    Host "10.19.110.5"
+    Port "5672"
+#    User "guest"
+#    Password "guest"
+     Address "collectd"
+#    <Instance "log">
+#        Format JSON
+#        PreSettle false
+#    </Instance>
+#     <Instance "notify">
+#        Format JSON
+#        PreSettle true
+#    </Instance>
+    <Instance "telemetry">
+        Format JSON
+        PreSettle false
+    </Instance>
+  </Transport>
+</Plugin>
+```
 **:scream://Didn’t add qpid proton link. Instead of building the pakcage, choose to do yum install.**
 
 **:thought_balloon:During testing qpid proton verson 0.18.1 wast not available in release repo . Hence used test repo**
@@ -116,6 +141,8 @@ Follow error message to run "$go get dependencies"
 ```
 ##### Smart Agent Usage
 ---
+**Test : Running Benchmark**
+- go test -bench=.
 
 **For running with AMQP and Prometheus use following option.**
 ```
