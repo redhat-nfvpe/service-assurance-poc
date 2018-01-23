@@ -10,6 +10,25 @@ import (
 	"testing"
 	"time"
 )
+func BenchmarkWithSampleData(b *testing.B){
+	/* example
+	b.RunParallel(func(pb *testing.PB) {
+	        for pb.Next() {
+	            SomeFunction()
+	        }
+	    })
+	*/
+	fmt.Printf("\nTest data  will run for %d times\n ", b.N)
+	var cacheServer *cacheutil.CacheServer
+	cacheServer = cacheutil.NewCacheServer()
+	incomingType := incoming.NewInComing(incoming.COLLECTD)
+	for hostid := 0; hostid < b.N; hostid++ {
+		var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", hostid)
+		go cacheServer.GenrateSampleData(hostname, 100, incomingType)
+	}
+
+}
+
 
 func TestPut(t *testing.T) {
 	var cacheserver = cacheutil.NewCacheServer()
