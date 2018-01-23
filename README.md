@@ -1,9 +1,32 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/redhat-nfvpe/service-assurance-poc)](https://goreportcard.com/report/github.com/redhat-nfvpe/service-assurance-poc)
-## Note about github branch
-###  collectd branch:
-**collectd branch only works for collectd as incoming data source for metrics.**
-## master branch:
- **master branch code base is not tightly coupled with single incoming data source, It has the flexibility to add many different types of incoming data sources(collectd, statsd,fluentd etc ).**
+## Note about development
+- got to https://github.com/redhat-nfvpe/service-assurance-poc and fork it to your account
+- Now in your environment run
+  - go get github.com/redhat-nfvpe/service-assurance-poc
+-  and Navigate to the top level of the repository  service-assurance-poc
+ ```
+ cd to service-assurance-poc
+ ```
+
+- Rename the current origin remote to upstream
+```
+git remote rename origin upstream https://github.com/yourname/service-assurance-poc.git
+
+```
+- From here, the best approach would be to create a feature branch and work from there.
+```
+git checkout -t -b new-feature
+// create new feature commits
+git add files
+git commit -m "message"
+git push origin new-feature
+```
+- Don’t forget to pull the changes from upstream before sending in a PR. This helps avoid merge conflicts.
+```
+git fetch upstream
+git merge upstream/master
+```
+
 
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
@@ -29,7 +52,7 @@ Read barometer docker user guide [barometer docker user guide](http://docs.opnfv
 - $ cd barometer/docker/barometer-collectd
 - $ sudo docker build -t opnfv/barometer-collectd --build-arg http_proxy=`echo $http_proxy` \
   --build-arg https_proxy=`echo $https_proxy` -f Dockerfile .
-  
+
 **Installing barometer collectd container WITH AMQP plugin**
 
 **Applying AMQP1.0 plugin patch to build docker images**
