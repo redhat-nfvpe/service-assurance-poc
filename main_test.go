@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 )
-func BenchmarkWithSampleData(b *testing.B){
+
+func BenchmarkWithSampleData(b *testing.B) {
 	/* example
 	b.RunParallel(func(pb *testing.PB) {
 	        for pb.Next() {
@@ -28,7 +29,6 @@ func BenchmarkWithSampleData(b *testing.B){
 	}
 
 }
-
 
 func TestPut(t *testing.T) {
 	var cacheserver = cacheutil.NewCacheServer()

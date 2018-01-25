@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-//Collectd  ...
+// Collectd  ...
 type Collectd struct {
 	Values         []float64
 	Dstypes        []string
@@ -24,22 +24,23 @@ type Collectd struct {
 	new            bool
 }
 
-//CreateNewCollectd don't use .... use incoming.NewInComing
-func CreateNewCollectd() *Collectd {
+// createNewCollectd don't use .... use incoming.NewInComing
+// used at only GenerateSampleData()
+func createNewCollectd() *Collectd {
 	return new(Collectd)
 }
 
-//GetName implement interface
+// GetName implement interface
 func (c Collectd) GetName() string {
 	return c.Plugin
 }
 
-//GetKey ...
+// GetKey ...
 func (c Collectd) GetKey() string {
 	return c.Host
 }
 
-//ParseInputByte ....
+// ParseInputByte ....
 func (c *Collectd) ParseInputByte(data []byte) error {
 	cparse := make([]Collectd, 1)
 	//var jsonBlob = []byte(collectdJson)
@@ -54,17 +55,17 @@ func (c *Collectd) ParseInputByte(data []byte) error {
 	return nil
 }
 
-//SetNew  .
+// SetNew  .
 func (c *Collectd) SetNew(new bool) {
 	c.new = new
 }
 
-//ISNew   ..
+// ISNew   ..
 func (c *Collectd) ISNew() bool {
 	return c.new
 }
 
-//DSName newName converts one data source of a value list to a string representation.
+// DSName newName converts one data source of a value list to a string representation.
 func (c *Collectd) DSName(index int) string {
 	if c.Dsnames != nil {
 		return c.Dsnames[index]
@@ -74,7 +75,7 @@ func (c *Collectd) DSName(index int) string {
 	return "value"
 }
 
-//SetData   ...
+// SetData   ...
 func (c *Collectd) SetData(data IncomingDataInterface) {
 	if collectd, ok := data.(*Collectd); ok { // type assert on it
 		if c.Host != collectd.Host {
@@ -98,7 +99,6 @@ func (c *Collectd) SetData(data IncomingDataInterface) {
 			c.TypeInstance = collectd.TypeInstance
 		}
 		c.SetNew(true)
-
 	}
 }
 
@@ -130,11 +130,9 @@ func (c Collectd) GetMetricDesc(index int) string {
 
 //GetMetricName  ..
 func (c Collectd) GetMetricName(index int) string {
-	var name string
+	name := "service_assurance_collectd_" + c.Plugin + "_" + c.Type
 	if c.Plugin == c.Type {
 		name = "service_assurance_collectd_" + c.Type
-	} else {
-		name = "service_assurance_collectd_" + c.Plugin + "_" + c.Type
 	}
 
 	if dsname := c.DSName(index); dsname != "value" {
@@ -151,18 +149,16 @@ func (c Collectd) GetMetricName(index int) string {
 
 //GetItemKey  ...
 func (c Collectd) GetItemKey() string {
-	var name string
+	name := c.Plugin + "_" + c.Type
 	if c.Plugin == c.Type {
 		name = c.Type
-	} else {
-		name = c.Plugin + "_" + c.Type
 	}
 	return name
 }
 
 //GenerateSampleData  ...
 func (c *Collectd) GenerateSampleData(hostname string, pluginname string) IncomingDataInterface {
-	collectd := CreateNewCollectd()
+	collectd := createNewCollectd()
 	collectd.Host = hostname
 	collectd.Plugin = pluginname
 	collectd.Type = pluginname
@@ -178,7 +174,7 @@ func (c *Collectd) GenerateSampleData(hostname string, pluginname string) Incomi
 //ParseInputJSON   ...
 func (c *Collectd) ParseInputJSON(jsonString string) error {
 	collect := make([]Collectd, 1)
-	var jsonBlob = []byte(jsonString)
+	jsonBlob := []byte(jsonString)
 	err := json.Unmarshal(jsonBlob, &collect)
 	if err != nil {
 		log.Println("error:", err)
@@ -188,7 +184,6 @@ func (c *Collectd) ParseInputJSON(jsonString string) error {
 	c1.SetNew(true)
 	c.SetData(&c1)
 	return nil
-
 }
 
 //GenerateSampleJSON  ... for samples

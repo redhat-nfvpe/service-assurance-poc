@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 )
 
 var (
@@ -21,10 +21,7 @@ func NewCollectdMetric(collectd incoming.Collectd, index int) (prometheus.Metric
 	case "gauge":
 		value = float64(collectd.Values[index])
 		valueType = prometheus.GaugeValue
-	case "derive":
-		value = float64(collectd.Values[index])
-		valueType = prometheus.CounterValue
-	case "counter":
+	case "derive", "counter":
 		value = float64(collectd.Values[index])
 		valueType = prometheus.CounterValue
 	default:
@@ -40,5 +37,6 @@ func NewCollectdMetric(collectd incoming.Collectd, index int) (prometheus.Metric
 		collectd.Plugin, collectd.Type, collectd.Dstypes[index], collectd.DSName(index))
 	metricName := metricNameRe.ReplaceAllString(collectd.GetMetricName(index), "_")
 	desc := prometheus.NewDesc(metricName, help, []string{}, plabels)
+
 	return prometheus.NewConstMetric(desc, valueType, value)
 }
