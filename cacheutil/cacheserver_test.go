@@ -10,10 +10,10 @@ import (
 
 func TestCacheServer(t *testing.T) {
 	//ch:=  make(chan IncomingBuffer)
-	var hostname string
-	hostname = "host"
+	hostname := "host"
 	collectd := incoming.NewInComing(incoming.COLLECTD)
 	newSample := collectd.GenerateSampleData(hostname, "pg")
+
 	if newSample.GetKey() != hostname {
 		t.Errorf("Data Key is not matching , expected %s and got %s", hostname, newSample.GetKey())
 	}
@@ -21,8 +21,8 @@ func TestCacheServer(t *testing.T) {
 }
 
 func TestCacheServer2(t *testing.T) {
-	var pluginCount = 10
-	var hostname = "hostname"
+	pluginCount := 10
+	hostname := "hostname"
 	//	var hostCount=1
 	//	var freeListToCollectSample = make(chan *IncomingBuffer, 100)
 
@@ -33,8 +33,7 @@ func TestCacheServer2(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	var incomingDataCache *IncomingDataCache
-	incomingDataCache = server.GetCache()
+	incomingDataCache := server.GetCache()
 	if size := incomingDataCache.Size(); size != 1 {
 		t.Errorf("wrong count of host , expected 1 and got %d", size)
 	}

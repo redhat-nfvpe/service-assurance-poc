@@ -1,9 +1,9 @@
 package cacheutil
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 	"github.com/redhat-nfvpe/service-assurance-poc/tsdb"
-	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"sync"
 
@@ -207,10 +207,9 @@ LOOP:
 func (cs *CacheServer) GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
 	//100 plugins
 	for j := 0; j < itemCount; j++ {
-		var pluginname = fmt.Sprintf("%s_%d", "plugin_name_", j)
+		pluginname := fmt.Sprintf("%s_%d", "plugin_name_", j)
 		//. defer wg.Done()
-		var newSample incoming.IncomingDataInterface
-		newSample = datatype.GenerateSampleData(key, pluginname)
+		newSample := datatype.GenerateSampleData(key, pluginname)
 		cs.Put(newSample)
 
 	}

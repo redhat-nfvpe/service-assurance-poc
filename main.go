@@ -1,10 +1,11 @@
 package main
 
 import (
+	"github.com/MakeNowJust/heredoc"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
 	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"flag"
 	"fmt"
@@ -51,35 +52,38 @@ func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+/*************** main routine ***********************/
 // Usage and command-line flags
 func usage() {
+	doc := heredoc.Doc(`
+
+	For running with AMQP and Prometheus use following option
+	********************* Production *********************
+	go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry
+	**************************************************************
+
+	For running Sample data wihout AMQP use following option
+	********************* Sample Data *********************
+	go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 
+	*************************************************************`)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
-	fmt.Fprintln(os.Stdout, `''`)
-	fmt.Fprintln(os.Stdout, `For running with AMQP and Prometheus use following option`)
-	fmt.Fprintln(os.Stdout, `'********************* Production *********************'`)
-	fmt.Fprintln(os.Stdout, `go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry `)
-	fmt.Fprintln(os.Stdout, `'**************************************************************'`)
-	fmt.Fprintln(os.Stdout, `''`)
-	fmt.Fprintln(os.Stdout, `''`)
-	fmt.Fprintln(os.Stdout, `For running Sample data wihout AMQP use following option\n`)
-	fmt.Fprintln(os.Stdout, `'********************* Sample Data *********************'`)
-	fmt.Fprintln(os.Stdout, `go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 `)
-	fmt.Fprintln(os.Stdout, `'**************************************************************'`)
+	fmt.Fprintln(os.Stdout, doc)
 	flag.PrintDefaults()
 }
 
-var fExporterhost = flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
-var fExporterport = flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
-var fAmqpurl = flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
-var fCount = flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
-
-var fSampledata = flag.Bool("usesample", false, "Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)")
-var fHosts = flag.Int("h", 1, "No of hosts : Sample hosts required (default 1).")
-var fPlugins = flag.Int("p", 100, "No of plugins: Sample plugins per host(default 100).")
-var fIterations = flag.Int("t", 1, "No of times to run sample data (default 1) -1 for ever.")
-
 func main() {
+	// set flags for parsing options
 	flag.Usage = usage
+	fExporterhost := flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
+	fExporterport := flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
+	fAmqpurl := flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
+	fCount := flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
+
+	fSampledata := flag.Bool("usesample", false, "Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)")
+	fHosts := flag.Int("h", 1, "No of hosts : Sample hosts required (default 1).")
+	fPlugins := flag.Int("p", 100, "No of plugins: Sample plugins per host(default 100).")
+	fIterations := flag.Int("t", 1, "No of times to run sample data (default 1) -1 for ever.")
+
 	flag.Parse()
 
 	if *fSampledata == false && len(*fAmqpurl) == 0 {
@@ -87,13 +91,13 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+
 	//Cache sever to process and serve the exporter
-	var cacheServer *cacheutil.CacheServer
-	cacheServer = cacheutil.NewCacheServer()
+	cacheServer := cacheutil.NewCacheServer()
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
-
 	prometheus.MustRegister(myHandler)
+
 	http.Handle("/metrics", prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
@@ -107,7 +111,7 @@ func main() {
 
 	//run exporter fro prometheus to scrape
 	go func() {
-		var metricsURL = fmt.Sprintf("%s:%d", *fExporterhost, *fExporterport)
+		metricsURL := fmt.Sprintf("%s:%d", *fExporterhost, *fExporterport)
 		log.Fatal(http.ListenAndServe(metricsURL, nil))
 	}()
 
@@ -122,7 +126,7 @@ func main() {
 			for hosts := 0; hosts < *fHosts; hosts++ {
 				go func(host_id int) {
 					defer hostwaitgroup.Done()
-					var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
+					hostname := fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
 					incomingType := incoming.NewInComing(incoming.COLLECTD)
 					go cacheServer.GenrateSampleData(hostname, *fPlugins, incomingType)
 				}(hosts)
@@ -135,9 +139,8 @@ func main() {
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
 		notifier := make(chan string) // Channel for messages from goroutines to main()
-		var amqpurl = fmt.Sprintf("amqp://%s", *fAmqpurl)
-		var amqpServer *amqplistener.AMQPServer
-		amqpServer = amqplistener.NewAMQPServer(amqpurl, true, *fCount, notifier)
+		amqpurl := fmt.Sprintf("amqp://%s", *fAmqpurl)
+		amqpServer := amqplistener.NewAMQPServer(amqpurl, true, *fCount, notifier)
 
 		for {
 			data := <-amqpServer.GetNotifier()
