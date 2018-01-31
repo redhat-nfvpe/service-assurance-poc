@@ -130,9 +130,9 @@ func (c Collectd) GetMetricDesc(index int) string {
 
 //GetMetricName  ..
 func (c Collectd) GetMetricName(index int) string {
-	name := "service_assurance_collectd_" + c.Plugin + "_" + c.Type
+	name := "sa_collectd_" + c.Plugin + "_" + c.Type
 	if c.Plugin == c.Type {
-		name = "service_assurance_collectd_" + c.Type
+		name = "sa_collectd_" + c.Type
 	}
 
 	if dsname := c.DSName(index); dsname != "value" {

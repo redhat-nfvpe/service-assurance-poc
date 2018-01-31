@@ -19,7 +19,7 @@ import (
 var (
 	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "service_assurance_collectd_last_pull_timestamp_seconds",
+			Name: "sa_collectd_last_pull_timestamp_seconds",
 			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
 		},
 	)
@@ -126,7 +126,7 @@ func main() {
 			for hosts := 0; hosts < *fHosts; hosts++ {
 				go func(host_id int) {
 					defer hostwaitgroup.Done()
-					hostname := fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
+					hostname := fmt.Sprintf("%s_%d", "redhat.boston.nfv", host_id)
 					incomingType := incoming.NewInComing(incoming.COLLECTD)
 					go cacheServer.GenrateSampleData(hostname, *fPlugins, incomingType)
 				}(hosts)
