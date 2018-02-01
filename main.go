@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"sync"
 	"time"
@@ -96,23 +97,34 @@ func main() {
 	cacheServer := cacheutil.NewCacheServer()
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
+
+	prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
+	prometheus.Unregister(prometheus.NewGoCollector())
+
 	prometheus.MustRegister(myHandler)
 
-	http.Handle("/metrics", prometheus.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	handler := http.NewServeMux()
+	handler.Handle("/metrics", prometheus.Handler())
+	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
-             <head><title>Collectd Exporter</title></head>
-             <body>cacheutil
-             <h1>Collectd Exporter</h1>
-             <p><a href='/metrics'>Metrics</a></p>
-             </body>
-             </html>`))
+                                <head><title>Collectd Exporter</title></head>
+                                <body>cacheutil
+                                <h1>Collectd Exporter</h1>
+                                <p><a href='/metrics'>Metrics</a></p>
+                                </body>
+                                </html>`))
 	})
+	// Register pprof handlers
+	handler.HandleFunc("/debug/pprof/", pprof.Index)
+	handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	//run exporter fro prometheus to scrape
 	go func() {
 		metricsURL := fmt.Sprintf("%s:%d", *fExporterhost, *fExporterport)
-		log.Fatal(http.ListenAndServe(metricsURL, nil))
+		log.Fatal(http.ListenAndServe(metricsURL, handler))
 	}()
 
 	if *fSampledata {
