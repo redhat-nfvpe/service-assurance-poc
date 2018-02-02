@@ -54,11 +54,10 @@ type host struct {
 
 func (m *metric) GetMetricMessage(i int) (msg string) {
 	msgTemplate := `
-{"values": [%f], "dstypes": ["derive"], "dsnames": ["samples"],
+[{"values": [%f], "dstypes": ["derive"], "dsnames": ["samples"],
 "time": %f, "interval": 10, "host": "%s", "plugin": "testPlugin",
-"plugin_instance": "testInstance","type": "%v","type_instance": ""}
+"plugin_instance": "testInstance","type": "%v","type_instance": ""}]
 `
-	//msg = fmt.Sprintf("%s/%s: %d",	*m.hostname,m.name, i)
 	msg = fmt.Sprintf(msgTemplate,
 		rand.Float64(),                           // val
 		float64((time.Now().UnixNano()))/1000000, // time
@@ -95,7 +94,7 @@ func printHostsInfo(hosts *[]host) {
 func main() {
 	// ./sa-bench -hosts 3 -metrics 2 -send 7 amqp://localhost:5672/foo
 
-	hostsNum := flag.Int("hosts", 1, "Simulate hosts")
+	hostsNum := flag.Int("hosts", 1, "Number of hosts to simulate")
 	metricsNum := flag.Int("metrics", 1, "Metrics per hosts")
 	intervalSec := flag.Int("interval", 1, "interval (sec)")
 	metricMaxSend := flag.Int("send", 1, "How many metrics sent")
@@ -143,7 +142,7 @@ func main() {
 					time.Duration(rand.Int()%1000))
 			*/
 			wait.Add(1)
-			go func(m *metric) {
+			go func(m metric) {
 				defer wait.Done()
 
 				addr := strings.TrimPrefix(url.Path, "/")
@@ -162,12 +161,10 @@ func main() {
 					body := m.GetMetricMessage(i)
 					msg.Marshal(body)
 					s.SendAsync(msg, ackChan, body)
-					fmt.Printf("sent: %v\n", body)
-					time.Sleep(
-						time.Duration(m.interval) *
-							time.Second)
+					fmt.Printf("sent: H:%v M:%v (%d)\n", *m.hostname, m.name, i)
+					time.Sleep(time.Duration(m.interval) * time.Second)
 				}
-			}(&w)
+			}(w)
 		}
 	}
 
