@@ -65,7 +65,7 @@ func usage() {
 
 	For running Sample data wihout AMQP use following option
 	********************* Sample Data *********************
-	go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 
+	go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
 	*************************************************************`)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
 	fmt.Fprintln(os.Stdout, doc)
@@ -99,7 +99,7 @@ func main() {
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
 
-	if *includeStats == false {
+	if *fIncludeStats == false {
 		// Including these stats kills performance when Prometheus polls with multiple targets
 		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
 		prometheus.Unregister(prometheus.NewGoCollector())

@@ -170,6 +170,8 @@ $go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
     	Metrics url for Prometheus to export.  (default "localhost")
   -mport int
     	Metrics port for Prometheus to export (http://localhost:<port>/metrics)  (default 8081)
+  -cpustats
+      Include cpu usage info in http requests (degrades performance)
   -p int
     	No of plugins: Sample plugins per host(default 100). (default 100)
   -t int
