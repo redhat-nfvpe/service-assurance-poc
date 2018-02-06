@@ -75,6 +75,7 @@ func usage() {
 func main() {
 	// set flags for parsing options
 	flag.Usage = usage
+	fIncludeStats := flag.Bool("cpustats", false, "Include cpu usage info in http requests (degrades performance)")
 	fExporterhost := flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
 	fExporterport := flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
 	fAmqpurl := flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
@@ -98,8 +99,11 @@ func main() {
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
 
-	prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
-	prometheus.Unregister(prometheus.NewGoCollector())
+	if *includeSTats == false {
+		// Including these stats kills performance when Prometheus polls with multiple targets
+		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
+		prometheus.Unregister(prometheus.NewGoCollector())
+	}
 
 	prometheus.MustRegister(myHandler)
 
