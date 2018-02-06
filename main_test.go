@@ -24,7 +24,7 @@ func BenchmarkWithSampleData(b *testing.B) {
 	cacheServer = cacheutil.NewCacheServer()
 	incomingType := incoming.NewInComing(incoming.COLLECTD)
 	for hostid := 0; hostid < b.N; hostid++ {
-		var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", hostid)
+		var hostname = fmt.Sprintf("%s_%d", "redhat.boston.nfv", hostid)
 		go cacheServer.GenrateSampleData(hostname, 100, incomingType)
 	}
 
@@ -44,7 +44,7 @@ func TestPut(t *testing.T) {
 				//100o hosts
 				//pluginChannel := make(chan cacheutil.Collectd)
 				//for each host make it on go routine
-				var hostname = fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
+				var hostname = fmt.Sprintf("%s_%d", "redhat.boston.nfv", host_id)
 				//fmt.Printf("Iteration %d hostname %s\n",times,hostname)
 
 				collectd := incoming.NewInComing(incoming.COLLECTD)

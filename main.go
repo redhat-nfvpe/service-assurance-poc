@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"sync"
 	"time"
@@ -19,7 +20,7 @@ import (
 var (
 	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "service_assurance_collectd_last_pull_timestamp_seconds",
+			Name: "sa_collectd_last_pull_timestamp_seconds",
 			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
 		},
 	)
@@ -74,6 +75,7 @@ func usage() {
 func main() {
 	// set flags for parsing options
 	flag.Usage = usage
+	fIncludeStats := flag.Bool("cpustats", false, "Include cpu usage info in http requests (degrades performance)")
 	fExporterhost := flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
 	fExporterport := flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
 	fAmqpurl := flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
@@ -96,23 +98,37 @@ func main() {
 	cacheServer := cacheutil.NewCacheServer()
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
+
+	if *includeStats == false {
+		// Including these stats kills performance when Prometheus polls with multiple targets
+		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
+		prometheus.Unregister(prometheus.NewGoCollector())
+	}
+
 	prometheus.MustRegister(myHandler)
 
-	http.Handle("/metrics", prometheus.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	handler := http.NewServeMux()
+	handler.Handle("/metrics", prometheus.Handler())
+	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
-             <head><title>Collectd Exporter</title></head>
-             <body>cacheutil
-             <h1>Collectd Exporter</h1>
-             <p><a href='/metrics'>Metrics</a></p>
-             </body>
-             </html>`))
+                                <head><title>Collectd Exporter</title></head>
+                                <body>cacheutil
+                                <h1>Collectd Exporter</h1>
+                                <p><a href='/metrics'>Metrics</a></p>
+                                </body>
+                                </html>`))
 	})
+	// Register pprof handlers
+	handler.HandleFunc("/debug/pprof/", pprof.Index)
+	handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	//run exporter fro prometheus to scrape
 	go func() {
 		metricsURL := fmt.Sprintf("%s:%d", *fExporterhost, *fExporterport)
-		log.Fatal(http.ListenAndServe(metricsURL, nil))
+		log.Fatal(http.ListenAndServe(metricsURL, handler))
 	}()
 
 	if *fSampledata {
@@ -126,7 +142,7 @@ func main() {
 			for hosts := 0; hosts < *fHosts; hosts++ {
 				go func(host_id int) {
 					defer hostwaitgroup.Done()
-					hostname := fmt.Sprintf("%s_%d", "redhat.bosoton.nfv", host_id)
+					hostname := fmt.Sprintf("%s_%d", "redhat.boston.nfv", host_id)
 					incomingType := incoming.NewInComing(incoming.COLLECTD)
 					go cacheServer.GenrateSampleData(hostname, *fPlugins, incomingType)
 				}(hosts)
