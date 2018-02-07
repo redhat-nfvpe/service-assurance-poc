@@ -30,6 +30,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"runtime/pprof"
 )
 
 func usage() {
@@ -60,7 +61,7 @@ func (m *metric) GetMetricMessage(i int) (msg string) {
 `
 	msg = fmt.Sprintf(msgTemplate,
 		rand.Float64(),                           // val
-		float64((time.Now().UnixNano()))/1000000, // time
+		float64((time.Now().UnixNano()))/1000000000, // time
 		*m.hostname,                              // host
 		m.name)                                   // type
 
@@ -83,21 +84,14 @@ func generateHosts(hostsNum int, metricNum int, intervalSec int) []host {
 	return hosts
 }
 
-func printHostsInfo(hosts *[]host) {
-	for _, v := range *hosts {
-		for _, w := range v.metrics {
-			fmt.Printf("%v.%v\n", v.name, w.name)
-		}
-	}
-}
-
 func main() {
-	// ./sa-bench -hosts 3 -metrics 2 -send 7 amqp://localhost:5672/foo
-
+	// parse command line option
 	hostsNum := flag.Int("hosts", 1, "Number of hosts to simulate")
 	metricsNum := flag.Int("metrics", 1, "Metrics per hosts")
 	intervalSec := flag.Int("interval", 1, "interval (sec)")
 	metricMaxSend := flag.Int("send", 1, "How many metrics sent")
+	showTimePerMessages := flag.Int("timepermesgs", -1, "Show time for each given messages")
+	pprofileFileName := flag.String("pprofile", "", "go pprofile output")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -113,11 +107,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *pprofileFileName != "" {
+		f, err := os.Create(*pprofileFileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	hosts := generateHosts(*hostsNum, *metricsNum, *intervalSec)
-	//printHostsInfo(&hosts)
 
-	container := electron.NewContainer(fmt.Sprintf("sabe%d", os.Getpid()))
+	container := electron.NewContainer(fmt.Sprintf("sa-bench%d", os.Getpid()))
 	url, err := amqp.ParseURL(urls[0])
 	if err != nil {
 		log.Fatal(err)
@@ -131,9 +133,11 @@ func main() {
 	}
 
 	ackChan := make(chan electron.Outcome)
+	mesgChan := make(chan string)
 
 	var wait sync.WaitGroup
 	var waitb sync.WaitGroup
+	startTime := time.Now()
 	for _, v := range hosts {
 		for _, w := range v.metrics {
 			// uncomment if need to rondom wait
@@ -144,24 +148,13 @@ func main() {
 			wait.Add(1)
 			go func(m metric) {
 				defer wait.Done()
-
-				addr := strings.TrimPrefix(url.Path, "/")
-				s, err := con.Sender(electron.Target(addr))
-				if err != nil {
-					log.Fatal(err)
-				}
-
 				for i := 0; ; i++ {
 					if i >= *metricMaxSend &&
 						*metricMaxSend != -1 {
 						break
 					}
 
-					msg := amqp.NewMessage()
-					body := m.GetMetricMessage(i)
-					msg.Marshal(body)
-					s.SendAsync(msg, ackChan, body)
-					fmt.Printf("sent: H:%v M:%v (%d)\n", *m.hostname, m.name, i)
+					mesgChan <- m.GetMetricMessage(i)
 					time.Sleep(time.Duration(m.interval) * time.Second)
 				}
 			}(w)
@@ -169,6 +162,37 @@ func main() {
 	}
 
 	cancel := make(chan struct{})
+	cancelMesg := make(chan struct{})
+	// routine for sending mesg
+	waitb.Add(1)
+	countSent := 0
+	go func() {
+		lastCounted := time.Now()
+		addr := strings.TrimPrefix(url.Path, "/")
+		s, err := con.Sender(electron.Target(addr),electron.AtMostOnce())
+		if err != nil {
+			log.Fatal(err)
+		}
+		for {
+			select {
+			case text := <-mesgChan:
+				msg := amqp.NewMessage()
+				body := amqp.Binary(text)
+				msg.Marshal(body)
+				s.SendAsync(msg, ackChan, body)
+				countSent = countSent + 1
+				if *showTimePerMessages != -1 && countSent % *showTimePerMessages == 0 {
+					fmt.Printf("Sent: %d sent (%v)\n", countSent, time.Now().Sub(lastCounted))
+					lastCounted = time.Now()
+				}
+
+			case <-cancelMesg:
+				waitb.Done()
+				return
+			}
+		}
+	}()
+
 	// routine for waiting ack....
 	waitb.Add(1)
 	go func() {
@@ -179,14 +203,8 @@ func main() {
 					log.Fatalf("acknowledgement %v error: %v",
 						out.Value, out.Error)
 				} else if out.Status != electron.Accepted {
-					//log.Fatalf("acknowledgement unexpected status: %v", out.Status)
 					log.Printf("acknowledgement unexpected status: %v", out.Status)
 				}
-				/*
-					} else {
-						fmt.Printf("acknowledgement %v (%v)\n",
-							out.Value, out.Status)
-				*/
 			case <-cancel:
 				waitb.Done()
 				return
@@ -195,7 +213,12 @@ func main() {
 	}()
 
 	wait.Wait()
+	close(cancelMesg)
 	close(cancel)
 	waitb.Wait()
 	con.Close(nil)
+	finishedTime := time.Now()
+	duration := finishedTime.Sub(startTime)
+	fmt.Printf("Total: %d sent (duration:%v, mesg/sec: %v)\n",
+		   countSent, duration, float64(countSent) / duration.Seconds())
 }
