@@ -43,7 +43,7 @@ func usage() {
 var hostnameTemplate = "hostname%03d"
 var metricsTemplate = "metrics%03d"
 
-type metric struct {
+type plugin struct {
 	hostname *string
 	name     string
 	interval int
@@ -51,10 +51,10 @@ type metric struct {
 
 type host struct {
 	name    string
-	metrics []metric
+	plugins []plugin
 }
 
-func (m *metric) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
+func (m *plugin) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
 	msgBuffer := make([]byte, 0, 1024)
 
 	msgBuffer = append(msgBuffer, "["...)
@@ -66,11 +66,11 @@ func (m *metric) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
 		msgBuffer = append(msgBuffer, strconv.FormatFloat(float64((time.Now().UnixNano()))/1000000000, 'f', 4, 64)...)
 		msgBuffer = append(msgBuffer, ", \"interval\": 10, \"host\": \""...)
 		msgBuffer = append(msgBuffer, *m.hostname...)
-		msgBuffer = append(msgBuffer, "\", \"plugin\": \"testPlugin\","...)
-		msgBuffer = append(msgBuffer, "\"plugin_instance\": \"testInstance"...)
-		msgBuffer = append(msgBuffer, strconv.Itoa(i)...)
-		msgBuffer = append(msgBuffer, "\",\"type\": \""...)
+		msgBuffer = append(msgBuffer, "\", \"plugin\": \""...)
 		msgBuffer = append(msgBuffer, m.name...)
+		msgBuffer = append(msgBuffer, "\",\"plugin_instance\": \"testInstance"...)
+		msgBuffer = append(msgBuffer, strconv.Itoa(i)...)
+		msgBuffer = append(msgBuffer, "\",\"type\": \"testType"...)
 		msgBuffer = append(msgBuffer, "\",\"type_instance\": \"\"}"...)
 		if i != msgInJson-1 {
 			msgBuffer = append(msgBuffer, ","...)
@@ -93,17 +93,17 @@ func (m *metric) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
 	*/
 }
 
-func generateHosts(hostsNum int, metricNum int, intervalSec int) []host {
+func generateHosts(hostsNum int, pluginNum int, intervalSec int) []host {
 
 	hosts := make([]host, hostsNum)
 	for i := 0; i < hostsNum; i++ {
 		hosts[i].name = fmt.Sprintf(hostnameTemplate, i)
-		hosts[i].metrics = make([]metric, metricNum)
-		for j := 0; j < metricNum; j++ {
-			hosts[i].metrics[j].name =
+		hosts[i].plugins = make([]plugin, pluginNum)
+		for j := 0; j < pluginNum; j++ {
+			hosts[i].plugins[j].name =
 				fmt.Sprintf(metricsTemplate, j)
-			hosts[i].metrics[j].interval = intervalSec
-			hosts[i].metrics[j].hostname = &hosts[i].name
+			hosts[i].plugins[j].interval = intervalSec
+			hosts[i].plugins[j].hostname = &hosts[i].name
 		}
 	}
 	return hosts
@@ -112,12 +112,13 @@ func generateHosts(hostsNum int, metricNum int, intervalSec int) []host {
 func main() {
 	// parse command line option
 	hostsNum := flag.Int("hosts", 1, "Number of hosts to simulate")
-	metricsNum := flag.Int("metrics", 1, "Metrics per hosts")
-	intervalSec := flag.Int("interval", 1, "interval (sec)")
+	metricsNum := flag.Int("metrics", 1, "Metrics per AMQP messages")
+	messagesNum := flag.Int("messages", 1, "Messages per interval")
+	intervalSec := flag.Int("interval", 1, "Interval (sec)")
 	metricMaxSend := flag.Int("send", 1, "How many metrics sent")
 	showTimePerMessages := flag.Int("timepermesgs", -1, "Show time for each given messages")
 	pprofileFileName := flag.String("pprofile", "", "go pprofile output")
-	metricsPerJson := flag.Int("jsons", 1, "metrics per json AMQP messages")
+	//metricsPerJson := flag.Int("jsons", 1, "metrics per json AMQP messages")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -143,7 +144,7 @@ func main() {
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	hosts := generateHosts(*hostsNum, *metricsNum, *intervalSec)
+	hosts := generateHosts(*hostsNum, *messagesNum, *intervalSec)
 
 	container := electron.NewContainer(fmt.Sprintf("sa-bench%d", os.Getpid()))
 	url, err := amqp.ParseURL(urls[0])
@@ -165,14 +166,14 @@ func main() {
 	var waitb sync.WaitGroup
 	startTime := time.Now()
 	for _, v := range hosts {
-		for _, w := range v.metrics {
+		for _, w := range v.plugins {
 			// uncomment if need to rondom wait
 			/*
 				time.Sleep(time.Millisecond *
 					time.Duration(rand.Int()%1000))
 			*/
 			wait.Add(1)
-			go func(m metric) {
+			go func(m plugin) {
 				defer wait.Done()
 				for i := 0; ; i++ {
 					if i >= *metricMaxSend &&
@@ -180,7 +181,7 @@ func main() {
 						break
 					}
 
-					mesgChan <- m.GetMetricMessage(i, *metricsPerJson)
+					mesgChan <- m.GetMetricMessage(i, *metricsNum)
 					time.Sleep(time.Duration(m.interval) * time.Second)
 				}
 			}(w)
@@ -247,5 +248,5 @@ func main() {
 	finishedTime := time.Now()
 	duration := finishedTime.Sub(startTime)
 	fmt.Printf("Total: %d sent (duration:%v, mesg/sec: %v, metric/sec: %v)\n",
-		countSent, duration, float64(countSent)/duration.Seconds(), float64(countSent * *metricsPerJson)/duration.Seconds())
+		countSent, duration, float64(countSent)/duration.Seconds(), float64(countSent * *metricsNum)/duration.Seconds())
 }
