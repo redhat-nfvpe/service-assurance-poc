@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func GetFieldStr(dataItem IncomingDataInterface, field string) string {
+func GetFieldStr(dataItem DataTypeInterface, field string) string {
 	r := reflect.ValueOf(dataItem)
 	f := reflect.Indirect(r).FieldByName(field)
 	return string(f.String())
@@ -26,7 +26,7 @@ func TestCollected(t *testing.T) {
 	//2
 	sample := c1.GenerateSampleData("hostname", "plugi_name")
 	if len(GetFieldStr(sample, "Plugin")) == 0 {
-		t.Errorf("Collectd data was not populated by GenrateSampleData %v", c1)
+		t.Errorf("Collectd data was not populated by GenrateSampleData %#v", c1)
 	}
 	c1 = NewInComing(COLLECTD)
 	c1.ParseInputJSON(jsonString)
@@ -63,7 +63,7 @@ func TestCollected(t *testing.T) {
 	}
 	errors := c1.ParseInputByte([]byte("error string"))
 	if errors == nil {
-		t.Errorf("Excepted error got nil%v", errors)
+		t.Errorf("Excepted error got nil%#v", errors)
 	}
 }
 

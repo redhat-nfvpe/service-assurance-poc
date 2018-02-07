@@ -1,13 +1,13 @@
 package incoming
 
-//IncomingDataInterface   ...
-type IncomingDataInterface interface {
+//DataTypeInterface   ...
+type DataTypeInterface interface {
 	GetName() string
-	SetData(data IncomingDataInterface)
+	SetData(data DataTypeInterface)
 	ParseInputJSON(json string) error
 	GetKey() string
 	GetItemKey() string
-	GenerateSampleData(key string, itemkey string) IncomingDataInterface
+	GenerateSampleData(key string, itemkey string) DataTypeInterface
 	GenerateSampleJSON(key string, itemkey string) string
 	ParseInputByte(data []byte) error
 	//GenerateSamples(jsonstring string) *Interface
@@ -24,16 +24,16 @@ type TSDB interface {
 	GetMetricDesc(index int) string
 }
 
-//IncomingDataType   ..
-type IncomingDataType int
+//DataType   ..
+type DataType int
 
 //COLLECTD
 const (
-	COLLECTD IncomingDataType = 1 << iota
+	COLLECTD DataType = 1 << iota
 )
 
 //NewInComing   ..
-func NewInComing(t IncomingDataType) IncomingDataInterface {
+func NewInComing(t DataType) DataTypeInterface {
 	switch t {
 	case COLLECTD:
 		return newCollectd( /*...*/ )
@@ -47,16 +47,16 @@ func newCollectd() *Collectd {
 }
 
 //GenerateData  Generates sample data in source format
-func GenerateData(dataItem IncomingDataInterface, key string, itemkey string) IncomingDataInterface {
+func GenerateData(dataItem DataTypeInterface, key string, itemkey string) DataTypeInterface {
 	return dataItem.GenerateSampleData(key, itemkey)
 }
 
 //GenerateJSON  Generates sample data  in json format
-func GenerateJSON(dataItem IncomingDataInterface, key string, itemkey string) string {
+func GenerateJSON(dataItem DataTypeInterface, key string, itemkey string) string {
 	return dataItem.GenerateSampleJSON(key, itemkey)
 }
 
 //ParseByte  parse incoming data
-func ParseByte(dataItem IncomingDataInterface, data []byte) error {
+func ParseByte(dataItem DataTypeInterface, data []byte) error {
 	return dataItem.ParseInputByte(data)
 }
