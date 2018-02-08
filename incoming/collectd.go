@@ -46,7 +46,7 @@ func (c *Collectd) ParseInputByte(data []byte) error {
 	//var jsonBlob = []byte(collectdJson)
 	err := json.Unmarshal(data, &cparse)
 	if err != nil {
-		log.Printf("error:%v", err)
+		log.Printf("Error parsing InputByte:%v", err)
 		return err
 	}
 	c1 := cparse[0]
@@ -76,7 +76,7 @@ func (c *Collectd) DSName(index int) string {
 }
 
 // SetData   ...
-func (c *Collectd) SetData(data IncomingDataInterface) {
+func (c *Collectd) SetData(data DataTypeInterface) {
 	if collectd, ok := data.(*Collectd); ok { // type assert on it
 		if c.Host != collectd.Host {
 			c.Host = collectd.Host
@@ -157,7 +157,7 @@ func (c Collectd) GetItemKey() string {
 }
 
 //GenerateSampleData  ...
-func (c *Collectd) GenerateSampleData(hostname string, pluginname string) IncomingDataInterface {
+func (c *Collectd) GenerateSampleData(hostname string, pluginname string) DataTypeInterface {
 	collectd := createNewCollectd()
 	collectd.Host = hostname
 	collectd.Plugin = pluginname
@@ -177,7 +177,7 @@ func (c *Collectd) ParseInputJSON(jsonString string) error {
 	jsonBlob := []byte(jsonString)
 	err := json.Unmarshal(jsonBlob, &collect)
 	if err != nil {
-		log.Println("error:", err)
+		log.Println("Error parsing json:", err)
 		return err
 	}
 	c1 := collect[0]

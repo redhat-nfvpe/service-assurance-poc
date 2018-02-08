@@ -1,15 +1,12 @@
 package: github.com/redhat-nfvpe/service-assurance-poc
 import:
+- package: github.com/MakeNowJust/heredoc
 - package: github.com/prometheus/client_golang
+  version: v0.9.0-pre1
   subpackages:
   - prometheus
-- package: github.com/redhat-nfvpe/service-assurance-poc
-  subpackages:
-  - amqp
-  - cacheutil
-  - incoming
-  - tsdb
 - package: qpid.apache.org
+  version: 0.20.0
   subpackages:
   - amqp
   - electron
