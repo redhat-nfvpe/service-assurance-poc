@@ -1,0 +1,46 @@
+---
+# copied from openenergi/go-event-hub...
+# Run this playbook with this command:
+# `ansible-playbook travis-setup-amqp.yaml --extra-vars "workdir=$TRAVIS_BUILD_DIR/qpid-proton-build"`
+- name: Make sure Apache Qpid is built and configured
+  hosts: localhost
+  become: true
+  become_user: root
+  tasks:
+  - name: set workdir
+    set_fact: workdir="{{ workdir }}"
+  - name: Update repositories cache
+    apt:
+      update_cache: yes
+  - name: Install the dependencies needed to compile Apache QPID
+    apt: name={{item}} state=installed
+    with_items:
+      - gcc
+      - g++
+      - cmake
+      - uuid-dev
+      - make
+  - name: Install SSL and Cyrus SASL requirements and Swig
+    apt: name={{item}} state=installed
+    with_items:
+      - libssl-dev
+      - libsasl2-2
+      - libsasl2-dev
+      - libsasl2-modules
+      - swig
+  - name: Make sure src directory is there
+    file: path={{workdir}}/src state=directory
+  - name: Clone Qpid
+    git:
+      repo: 'http://git.apache.org/qpid-proton.git'
+      clone: yes
+      dest: /{{workdir}}/src/qpid-proton
+      version: tags/0.19.0
+  - name: Make sure the build directory for Qpid is there
+    file: path={{workdir}}/src/qpid-proton/build state=directory
+  - name: Configure Qpid using cmake
+    command: bash -c 'cd {{workdir}}/src/qpid-proton/build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DSYSINSTALL_BINDINGS=ON'
+    changed_when: false
+  - name: Make install Qpid
+    command: bash -c 'cd {{workdir}}/src/qpid-proton/build && make install'
+    changed_when: false
