@@ -17,7 +17,7 @@ var quitCacheServerCh = make(chan struct{})
 //IncomingBuffer  this is inut data send to cache server
 //IncomingBuffer  ..its of type collectd or anything else
 type IncomingBuffer struct {
-	data incoming.IncomingDataInterface
+	data incoming.DataTypeInterface
 }
 
 //IncomingDataCache cache server converts it into this
@@ -29,7 +29,7 @@ type IncomingDataCache struct {
 //ShardedIncomingDataCache types of sharded cache collectd, influxdb etc
 //ShardedIncomingDataCache  ..
 type ShardedIncomingDataCache struct {
-	plugin map[string]incoming.IncomingDataInterface
+	plugin map[string]incoming.DataTypeInterface
 	lock   *sync.RWMutex
 }
 
@@ -44,7 +44,7 @@ func NewCache() IncomingDataCache {
 //NewShardedIncomingDataCache   .
 func NewShardedIncomingDataCache() *ShardedIncomingDataCache {
 	return &ShardedIncomingDataCache{
-		plugin: make(map[string]incoming.IncomingDataInterface),
+		plugin: make(map[string]incoming.DataTypeInterface),
 		lock:   new(sync.RWMutex),
 	}
 }
@@ -76,7 +76,7 @@ func (i IncomingDataCache) GetShard(key string) *ShardedIncomingDataCache {
 }
 
 //GetData   ..
-func (shard *ShardedIncomingDataCache) GetData(pluginname string) incoming.IncomingDataInterface {
+func (shard *ShardedIncomingDataCache) GetData(pluginname string) incoming.DataTypeInterface {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	return shard.plugin[pluginname]
@@ -99,7 +99,7 @@ func (shard *ShardedIncomingDataCache) Size() int {
 }
 
 //SetData  TODO : add generic
-func (shard *ShardedIncomingDataCache) SetData(data incoming.IncomingDataInterface) error {
+func (shard *ShardedIncomingDataCache) SetData(data incoming.DataTypeInterface) error {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
 	if shard.plugin[data.GetItemKey()] == nil {
@@ -137,7 +137,7 @@ func NewCacheServer() *CacheServer {
 }
 
 //Put   ..
-func (cs *CacheServer) Put(incomingData incoming.IncomingDataInterface) {
+func (cs *CacheServer) Put(incomingData incoming.DataTypeInterface) {
 	var buffer *IncomingBuffer
 	select {
 	case buffer = <-freeList:
@@ -204,7 +204,7 @@ LOOP:
 }
 
 //GenrateSampleData  ....
-func (cs *CacheServer) GenrateSampleData(key string, itemCount int, datatype incoming.IncomingDataInterface) {
+func (cs *CacheServer) GenrateSampleData(key string, itemCount int, datatype incoming.DataTypeInterface) {
 	//100 plugins
 	for j := 0; j < itemCount; j++ {
 		pluginname := fmt.Sprintf("%s_%d", "plugin_name_", j)
