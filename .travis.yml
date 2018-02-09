@@ -1,0 +1,22 @@
+language: go
+sudo: required
+dist: trusty
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install 
+  - pip install --user ansible
+  - mkdir ${TRAVIS_BUILD_DIR}/qpid-proton-build
+  - ansible-playbook --extra-vars "workdir=${TRAVIS_BUILD_DIR}/qpid-proton-build" -c local -i localhost, ci/travis-setup-amqp.yaml
+
+install:
+  - go get github.com/golang/lint/golint
+
+before_script:
+  - go get .
+  - go vet .
+  - golint . | xargs -r false
+
+script:
+  - go build
+  - go build -o tools/sa-bench/sa-bench tools/sa-bench/main.go
