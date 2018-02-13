@@ -54,11 +54,11 @@ type host struct {
 	plugins []plugin
 }
 
-func (m *plugin) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
+func (m *plugin) GetMetricMessage(nthSend int, msgInJSON int) (msg string) {
 	msgBuffer := make([]byte, 0, 1024)
 
 	msgBuffer = append(msgBuffer, "["...)
-	for i := 0; i < msgInJson; i++ {
+	for i := 0; i < msgInJSON; i++ {
 		msgBuffer = append(msgBuffer, "{\"values\": ["...)
 		msgBuffer = append(msgBuffer, strconv.FormatFloat(rand.Float64(), 'f', 4, 64)...)
 		msgBuffer = append(msgBuffer, "], \"dstypes\": [\"derive\"], \"dsnames\": [\"samples\"],"...)
@@ -72,7 +72,7 @@ func (m *plugin) GetMetricMessage(nthSend int, msgInJson int) (msg string) {
 		msgBuffer = append(msgBuffer, strconv.Itoa(i)...)
 		msgBuffer = append(msgBuffer, "\",\"type\": \"testType"...)
 		msgBuffer = append(msgBuffer, "\",\"type_instance\": \"\"}"...)
-		if i != msgInJson-1 {
+		if i != msgInJSON-1 {
 			msgBuffer = append(msgBuffer, ","...)
 		}
 	}
