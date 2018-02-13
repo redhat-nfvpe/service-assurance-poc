@@ -109,6 +109,94 @@ func generateHosts(hostsNum int, pluginNum int, intervalSec int) []host {
 	return hosts
 }
 
+func getMessagesLimit(urls string) {
+	dummyHost := "testHost"
+	dummyPlugin := &plugin{
+		hostname: &dummyHost,
+		name: "testPlugin",
+		interval: 10,
+	}
+
+	container := electron.NewContainer(fmt.Sprintf("sa-bench%d", os.Getpid()))
+	url, err := amqp.ParseURL(urls)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	con, err := container.Dial("tcp", url.Host)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	ackChan := make(chan electron.Outcome)
+
+	var waitb sync.WaitGroup
+	startTime := time.Now()
+
+	cancel := make(chan struct{})
+	cancelMesg := make(chan struct{})
+	// routine for sending mesg
+	waitb.Add(1)
+	countSent := 0
+	go func() {
+		addr := strings.TrimPrefix(url.Path, "/")
+		s, err := con.Sender(electron.Target(addr), electron.AtMostOnce())
+		if err != nil {
+			log.Fatal(err)
+		}
+		for {
+			text := dummyPlugin.GetMetricMessage(countSent, 1)
+			msg := amqp.NewMessage()
+			body := amqp.Binary(text)
+			msg.Marshal(body)
+			s.SendAsync(msg, ackChan, body)
+			countSent = countSent + 1
+
+			select {
+			case <-cancelMesg:
+				waitb.Done()
+				return
+			default:
+			}
+		}
+	}()
+
+	// routine for waiting ack....
+	waitb.Add(1)
+	go func() {
+		for {
+			select {
+			case out := <-ackChan:
+				if out.Error != nil {
+					log.Fatalf("acknowledgement %v error: %v",
+						out.Value, out.Error)
+				} else if out.Status != electron.Accepted {
+					log.Printf("acknowledgement unexpected status: %v", out.Status)
+				}
+			case <-cancel:
+				waitb.Done()
+				return
+			}
+		}
+	}()
+	fmt.Printf("waiting...")
+	time.Sleep(10 * time.Second)
+
+	fmt.Printf("Done!\n")
+	finishedTime := time.Now()
+	duration := finishedTime.Sub(startTime)
+	fmt.Printf("Total: %d sent (duration:%v, mesg/sec: %v)\n", countSent, duration, float64(countSent)/duration.Seconds())
+	os.Exit(0)
+	/*
+	close(cancelMesg)
+	close(cancel)
+	waitb.Wait()
+	con.Close(nil)
+	*/
+}
+
 func main() {
 	// parse command line option
 	hostsNum := flag.Int("hosts", 1, "Number of hosts to simulate")
@@ -118,7 +206,7 @@ func main() {
 	metricMaxSend := flag.Int("send", 1, "How many metrics sent")
 	showTimePerMessages := flag.Int("timepermesgs", -1, "Show time for each given messages")
 	pprofileFileName := flag.String("pprofile", "", "go pprofile output")
-	//metricsPerJson := flag.Int("jsons", 1, "metrics per json AMQP messages")
+	modeString := flag.String("mode", "simulate", "Mode (simulate/limit)")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -145,6 +233,14 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 	hosts := generateHosts(*hostsNum, *messagesNum, *intervalSec)
+
+	if *modeString == "limit" {
+		getMessagesLimit(urls[0])
+		return
+	} else if *modeString != "simulate" {
+		fmt.Fprintln(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
+		return
+	}
 
 	container := electron.NewContainer(fmt.Sprintf("sa-bench%d", os.Getpid()))
 	url, err := amqp.ParseURL(urls[0])
