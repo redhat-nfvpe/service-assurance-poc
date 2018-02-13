@@ -50,7 +50,14 @@ type AMQPServer struct {
 	connections chan electron.Connection
 }
 
-//NewAMQPServer  Create new AMQP server
+//MockAmqpServer  Create Mock AMQP server
+func MockAmqpServer(notifier chan string) *AMQPServer{
+	server := &AMQPServer{
+		notifier:    notifier,
+	}
+	return server
+}
+//NewAMQPServer   ...
 func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string) *AMQPServer {
 	if len(urlStr) == 0 {
 		log.Println("No URL provided")

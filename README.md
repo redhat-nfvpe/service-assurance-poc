@@ -80,10 +80,11 @@ LoadPlugin amqp1
 #        Format JSON
 #        PreSettle false
 #    </Instance>
-#     <Instance "notify">
-#        Format JSON
-#        PreSettle true
-#    </Instance>
+     <Instance "notify">
+        Format JSON
+        PreSettle true
+        Notify true
+    </Instance>
     <Instance "telemetry">
         Format JSON
         PreSettle false
@@ -111,13 +112,13 @@ WORKDIR ${repos_dir}/barometer/systems
 ```
 $ git clone https://github.com/aneeshkp/barometer.git
 $ cd barometer/docker/barometer-collectd
-$ sudo docker build -t opnfv/barometer-collectd --build-arg http_proxy=`echo $http_proxy` \
+$ sudo docker build --no-cache -t opnfv/barometer-collectd --build-arg http_proxy=`echo $http_proxy` \
   --build-arg https_proxy=`echo $https_proxy` -f Dockerfile .
 ```
 
 ##### To Deploy Barometer container
 ```
-docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.conf.d  -v /var/run:/var/run -v /tmp:/tmp --privileged opnfv/barometer /run_collectd.sh
+docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.conf.d  -v /var/run:/var/run -v /tmp:/tmp --privileged opnfv/barometer-collectd /run_collectd.sh
 ```
 **Here `pwd`/collect_config contains all collectd configuration files. Enable and disable plugin under this directory**
 
@@ -144,28 +145,47 @@ Follow error message to run "$go get dependencies"
 **Test : Running Benchmark**
 - go test -bench=.
 
-**For running with AMQP and Prometheus use following option.**
+**For running EVENTS with AMQP  use following option.**
 ```
-$go run main.go -mhost=localhost -mport=8081 -amqpurl=10.19.110.5:5672/collectd/telemetry
+$go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify
 ```
 
+**With configuration file.**
+
+```
+$go run events/main.go --config sa.event.congig.json
+
+```
+
+**For running METRICS with AMQP and Prometheus use following option.**
+```
+$go run metrics/main.go -mhost=localhost -mport=8081 -amqp1MetricURL=10.19.110.5:5672/collectd/telemetry
+```
+**With configuration file.**
+
+```
+$go run events/metrics.go --config sa.metrics.congig.json
+
+```
 ---
-**For running with Sample data,  wihout AMQP use the following option.**
+**For running metrics with Sample data,  wihout AMQP use the following option.**
 
-**Sample Data**
+**Sample Data for metrics**
 
 ```
-$go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
+$go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
 ```
 
 ```
 --- Usage Details
-  -amqpurl string
+  -config string
+      Path to configuration file(optional).if provided ignores all command line options"
+  -amqp1MetricURL string
     	AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry
   -count int
     	Stop after receiving this many messages in total(-1 forever) (OPTIONAL) (default -1)
   -h int
-    	No of hosts : Sample hosts required (deafult 1). (default 1)
+    	No of hosts : Sample hosts required (default 1). (default 1)
   -mhost string
     	Metrics url for Prometheus to export.  (default "localhost")
   -mport int
