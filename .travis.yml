@@ -13,9 +13,11 @@ install:
   - go get github.com/golang/lint/golint
 
 before_script:
-  - go get ./...
+  - go get .
+  - go get ./metrics
+  - go get ./events
   - go vet .
-  - golint ./... | xargs -r false
+  - golint . | xargs -r false
 
 script:
   - go build
