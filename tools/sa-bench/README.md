@@ -17,14 +17,22 @@ See [https://github.com/apache/qpid-proton/tree/master/examples/go#using-the-go-
 
     usage: ./sa-bench (options) ampq://...
     options:
+      -mode simulate|limit
+          Mode:
+              simulate: simulate collectd and send metrics
+              limit: Limit test to identify how many AMQP messages in a 10 sec.
       -hosts int
                 Simulate hosts (default 1)
       -interval int
                 Interval (sec) (default 1)
       -metrics int
-                Metrics per hosts (default 1)
+                Metrics per one AMQP messages (default 1)
+      -messages int
+                Messages per interval (default 1)
       -send int
-                How many metrics sent (default 1)
+                How many metrics sent (default 1, -1 means forever)
+      -timepermesgs
+                Show verbose messages for each given messages (default -1 = no message)
 
 ### Example1
 
