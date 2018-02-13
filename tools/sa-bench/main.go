@@ -109,7 +109,7 @@ func generateHosts(hostsNum int, pluginNum int, intervalSec int) []host {
 	return hosts
 }
 
-func getMessagesLimit(urls string) {
+func getMessagesLimit(urls string, metricsInAmqp int) {
 	dummyHost := "testHost"
 	dummyPlugin := &plugin{
 		hostname: &dummyHost,
@@ -147,7 +147,7 @@ func getMessagesLimit(urls string) {
 			log.Fatal(err)
 		}
 		for {
-			text := dummyPlugin.GetMetricMessage(countSent, 1)
+			text := dummyPlugin.GetMetricMessage(countSent, metricsInAmqp)
 			msg := amqp.NewMessage()
 			body := amqp.Binary(text)
 			msg.Marshal(body)
@@ -235,7 +235,7 @@ func main() {
 	hosts := generateHosts(*hostsNum, *messagesNum, *intervalSec)
 
 	if *modeString == "limit" {
-		getMessagesLimit(urls[0])
+		getMessagesLimit(urls[0], *metricsNum)
 		return
 	} else if *modeString != "simulate" {
 		fmt.Fprintln(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
