@@ -48,10 +48,11 @@ type AMQPServer struct {
 	msgcount    int
 	notifier    chan string
 	connections chan electron.Connection
+	prefetch    int
 }
 
 //NewAMQPServer  Create new AMQP server
-func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string) *AMQPServer {
+func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string, prefetch int) *AMQPServer {
 	if len(urlStr) == 0 {
 		log.Println("No URL provided")
 		//usage()
@@ -63,6 +64,7 @@ func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string
 		notifier:    notifier,
 		msgcount:    msgcount,
 		connections: make(chan electron.Connection, 1),
+		prefetch:    prefetch,
 	}
 	// Spawn off the server's main loop immediately
 	// not exported
@@ -100,9 +102,9 @@ func (s *AMQPServer) start() {
 		s.connections <- c // Save connection so we can Close() when start() ends
 		addr := strings.TrimPrefix(url.Path, "/")
 		opts := []electron.LinkOption{electron.Source(addr)}
-		/*if *prefetch > 0 {
-		  opts = append(opts, electron.Capacity(*prefetch), electron.Prefetch(true))
-		}*/
+		if s.prefetch > 0 {
+			opts = append(opts, electron.Capacity(s.prefetch), electron.Prefetch(true))
+		}
 		r, err := c.Receiver(opts...)
 		fatalIf(err)
 		// Loop receiving messages and sending them to the main() goroutine

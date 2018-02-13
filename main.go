@@ -80,6 +80,7 @@ func main() {
 	fExporterport := flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
 	fAmqpurl := flag.String("amqpurl", "", "AMQP1.0 listener example 127.0.0.1:5672/collectd/telemetry")
 	fCount := flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
+	fPrefetch := flag.Int("prefetch", 0, "Prefetch in AMQP listener")
 
 	fSampledata := flag.Bool("usesample", false, "Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)")
 	fHosts := flag.Int("h", 1, "No of hosts : Sample hosts required (default 1).")
@@ -156,7 +157,7 @@ func main() {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
 		notifier := make(chan string) // Channel for messages from goroutines to main()
 		amqpurl := fmt.Sprintf("amqp://%s", *fAmqpurl)
-		amqpServer := amqplistener.NewAMQPServer(amqpurl, true, *fCount, notifier)
+		amqpServer := amqplistener.NewAMQPServer(amqpurl, true, *fCount, notifier, *fPrefetch)
 
 		for {
 			data := <-amqpServer.GetNotifier()

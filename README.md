@@ -174,6 +174,8 @@ $go run main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
       Include cpu usage info in http requests (degrades performance)
   -p int
     	No of plugins: Sample plugins per host(default 100). (default 100)
+  -prefetch int
+    	Prefetch in AMQP listener
   -t int
     	No of times to run sample data (default 1) -1 for ever. (default 1)
   -usesample
