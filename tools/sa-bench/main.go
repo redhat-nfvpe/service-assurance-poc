@@ -238,7 +238,7 @@ func main() {
 		getMessagesLimit(urls[0], *metricsNum)
 		return
 	} else if *modeString != "simulate" {
-		fmt.Fprintln(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
+		fmt.Fprintf(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
 		return
 	}
 
