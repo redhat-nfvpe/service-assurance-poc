@@ -11,7 +11,13 @@ See [https://github.com/apache/qpid-proton/tree/master/examples/go#using-the-go-
 ## How to build
 
     # need to install
+    go get .
     go build main.go
+
+## Using Docker container
+
+    docker pull docker.io/s1061123/service-assurance-poc
+    docker run -it --rm docker.io/s1061123/service-assurance-poc sa-bench
 
 ## Usage
 
