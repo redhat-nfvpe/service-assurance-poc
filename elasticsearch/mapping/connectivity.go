@@ -1,4 +1,4 @@
-package elastic
+package saelastic
 const ConnectivityMapping = `
 {
    "mappings": {
@@ -112,7 +112,7 @@ const ConnectivityMapping = `
                }
             },
             "startsAt": {
-               "type": "text"
+               "type": "date"
             }
          }
        }

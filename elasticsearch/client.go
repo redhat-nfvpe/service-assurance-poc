@@ -1,8 +1,10 @@
-package elastic
+package saelastic
 
 //import "github.com/elastic/go-elasticsearch/client"
+import "github.com/redhat-nfvpe/service-assurance-poc/elasticsearch/mapping"
 import "github.com/olivere/elastic"
 import "github.com/satori/go.uuid"
+
 
 import (
 	"log"
@@ -33,6 +35,10 @@ type SAElasticClient struct {
   err error
 
 }
+//InitAllMappings ....
+func (ec * SAElasticClient) InitAllMappings(){
+  ec.CreateIndex(CONNECTIVITYINDEX,saelastic.ConnectivityMapping)
+}
 
 //CreateClient   ....
 func CreateClient(elastichost string) *SAElasticClient {
@@ -45,8 +51,8 @@ func CreateClient(elastichost string) *SAElasticClient {
     elasticClient.err=err
     return elasticClient
 	}
-
 	elasticClient = &SAElasticClient{client: eclient,ctx:context.Background()}
+  elasticClient.InitAllMappings()
 	return elasticClient
 }
 
@@ -79,26 +85,29 @@ func genUUIDv4() string {
   return id.String()
 }
 
-
 //Create...  it can be BodyJson or BodyString.. BodyJson needs struct defined
-func (ec *SAElasticClient) Create(indexname string,indextype string,jsondata string) {
+func (ec *SAElasticClient) Create(indexname IndexName,indextype IndexType,jsondata string) (string, error) {
   ctx :=ec.ctx
+  id:=genUUIDv4()
+  body:=Sanitize(jsondata)
+  log.Printf("Printing body %s\n",body)
   put2, err := ec.client.Index().
-  		Index(indexname).
-  		Type(indextype).
-  		Id(genUUIDv4()).
-  		BodyString(jsondata).
+  		Index(string(indexname)).
+  		Type(string(indextype)).
+  		Id(id).
+  		BodyString(body).
   		Do(ctx)
   	if err != nil {
   		// Handle error
-  		panic(err)
+  		return id,err
   	}
-  	log.Printf("Indexed tweet %s to index %s, type %s\n", put2.Id, put2.Index, put2.Type)
+  	log.Printf("Indexed  %s to index %s, type %s\n", put2.Id, put2.Index, put2.Type)
     // Flush to make sure the documents got written.
-	  _, err = ec.client.Flush().Index(indexname).Do(ctx)
-	  if err != nil {
-   		panic(err)
-	 }
+    // Flush asks Elasticsearch to free memory from the index and
+    // flush data to disk.
+	  _, err = ec.client.Flush().Index(string(indexname)).Do(ctx)
+ 		return id,err
+
 }
 
 //Update ....
@@ -107,21 +116,59 @@ func (ec *SAElasticClient) Update() {
 }
 
 //Delete
-func (ec *SAElasticClient) Delete(index string) {
+func (ec *SAElasticClient) DeleteIndex(index IndexName) error {
   // Delete an index.
-  	deleteIndex, err := ec.client.DeleteIndex(index).Do(ec.ctx)
+  	deleteIndex, err := ec.client.DeleteIndex(string(index)).Do(ec.ctx)
   	if err != nil {
   		// Handle error
-  		panic(err)
+  		//panic(err)
+      return err
   	}
   	if !deleteIndex.Acknowledged {
   		// Not acknowledged
   	}
+    return nil
+}
+
+
+//Delete  ....
+func (ec *SAElasticClient) Delete(indexname IndexName,indextype IndexType,id string) error {
+  // Get tweet with specified ID
+
+	_,err := ec.client.Delete().
+		Index(string(indexname)).
+		Type(string(indextype)).
+		Id(id).
+		Do(ec.ctx)
+  return err
+}
+
+//Get  ....
+func (ec *SAElasticClient) Get(indexname IndexName,indextype IndexType,id string)(*elastic.GetResult,error) {
+  // Get tweet with specified ID
+
+	result,err := ec.client.Get().
+		Index(string(indexname)).
+		Type(string(indextype)).
+		Id(id).
+		Do(ec.ctx)
+	if err != nil {
+		// Handle error
+		return nil,err
+	}
+	/*if result.Found {
+		return result.Fields,nil
+	}*/
+  if result.Found {
+		log.Printf("Got document %s in version %d from index %s, type %s\n", result.Id, result.Version, result.Index, result.Type)
+	}
+  return result,nil
 }
 
 //Search  ..
 func (ec *SAElasticClient) Search(indexname string) *elastic.SearchResult {
-  // Search with a term query
+  // Search with a term
+
 	termQuery := elastic.NewTermQuery("user", "olivere")
 	searchResult, err := ec.client.Search().
 		Index(indexname).   // search in index "twitter"

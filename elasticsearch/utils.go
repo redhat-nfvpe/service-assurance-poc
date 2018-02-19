@@ -1,4 +1,4 @@
-package elastic
+package saelastic
 
 import (
 	"encoding/json"
@@ -16,7 +16,9 @@ type  EventNotification struct{
 func Sanitize(jsondata string) string {
   r := strings.NewReplacer("\\\"","\"",
         "\"ves\":\"{", "\"ves\":{",
-        "}}\"}","}}}")
+        "}}\"}","}}}",
+       "[","",
+       "]","",)
     result := r.Replace(jsondata)
     return result
 

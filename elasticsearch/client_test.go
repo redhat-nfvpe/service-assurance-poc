@@ -1,4 +1,4 @@
-package elastic
+package saelastic
 
 import (
 
@@ -43,7 +43,7 @@ if client.err != nil{
 }
 }
 
-func TestIndexCreate(t *testing.T) {
+func TestIndexCreateAndDelete(t *testing.T) {
   var client *SAElasticClient
   client=CreateClient(elastichost)
   if client.err != nil{
@@ -54,21 +54,63 @@ func TestIndexCreate(t *testing.T) {
   		t.Errorf("Failed to get indexname and type%s", err)
       return
   	}
-    client.CreateIndex(indexName, elastic.ConnectivityMapping)
+
+    err=client.DeleteIndex(indexName)
+
+    client.CreateIndex(indexName, saelastic.ConnectivityMapping)
     exists, err := client.client.IndexExists(string(indexName)).Do(client.ctx)
-    if (exists=true || err !=nil){
+    if (exists==false || err !=nil){
       	t.Errorf("Failed to create index %s", err)
     }
-    client.Del
+    err=client.DeleteIndex(indexName)
+    if ( err !=nil){
+      	t.Errorf("Failed to Delete index %s", err)
+    }
   }
 
 }
 
-func TestIndexDelete(t *testing.T) {
-}
+func TestConnectivityDataCreate(t *testing.T) {
+  var client *SAElasticClient
+  client=CreateClient(elastichost)
+  if client.err != nil{
+      t.Errorf("Failed to connect to elastic search%s", client.err)
+  }else{
+     indexName, IndexType, err := GetIndexNameType(connectivitydata)
+    if err != nil {
+      t.Errorf("Failed to get indexname and type%s", err)
+      return
+    }
 
-func TestDataCreate(t *testing.T) {
-}
+    err=client.DeleteIndex(indexName)
 
-func TestDataDelete(t *testing.T) {
+    client.CreateIndex(indexName, saelastic.ConnectivityMapping)
+    exists, err := client.client.IndexExists(string(indexName)).Do(client.ctx)
+    if (exists==false || err !=nil){
+        t.Errorf("Failed to create index %s", err)
+    }
+
+    id,err:=client.Create(indexName,IndexType,connectivitydata)
+    if ( err !=nil){
+        t.Errorf("Failed to create data %s\n", err.Error())
+    }else{
+      log.Printf("document id  %#v\n",id)
+    }
+    result,err:=client.Get(indexName,IndexType,id)
+    if ( err !=nil){
+        t.Errorf("Failed to get data %s", err)
+    }else{
+      log.Printf("Data %#v",result)
+    }
+    deleteErr:=client.Delete(indexName,IndexType,id)
+    if ( deleteErr !=nil){
+        t.Errorf("Failed to delete data %s", deleteErr)
+    }
+
+    err=client.DeleteIndex(indexName)
+    if ( err !=nil){
+        t.Errorf("Failed to Delete index %s", err)
+    }
+  }
+
 }
