@@ -16,7 +16,9 @@ before_script:
   - go get .
   - go get ./metrics
   - go get ./events
-  - go vet .
+  - go vet ./metrics
+  - go vet ./events
+  - go vet ./tools/sa-bench
   - golint . | xargs -r false
 
 script:

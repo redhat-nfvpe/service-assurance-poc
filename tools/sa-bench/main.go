@@ -109,7 +109,7 @@ func generateHosts(hostsNum int, pluginNum int, intervalSec int) []host {
 	return hosts
 }
 
-func getMessagesLimit(urls string, metricsInAmqp int) {
+func getMessagesLimit(urls string, metricsInAmqp int, enableCPUProfile bool) {
 	dummyHost := "testHost"
 	dummyPlugin := &plugin{
 		hostname: &dummyHost,
@@ -181,13 +181,16 @@ func getMessagesLimit(urls string, metricsInAmqp int) {
 			}
 		}
 	}()
-	fmt.Printf("waiting...")
+	fmt.Printf("sending AMQP in 10 seconds...")
 	time.Sleep(10 * time.Second)
 
 	fmt.Printf("Done!\n")
 	finishedTime := time.Now()
 	duration := finishedTime.Sub(startTime)
 	fmt.Printf("Total: %d sent (duration:%v, mesg/sec: %v)\n", countSent, duration, float64(countSent)/duration.Seconds())
+	if enableCPUProfile {
+		pprof.StopCPUProfile()
+	}
 	os.Exit(0)
 	/*
 	close(cancelMesg)
@@ -235,10 +238,10 @@ func main() {
 	hosts := generateHosts(*hostsNum, *messagesNum, *intervalSec)
 
 	if *modeString == "limit" {
-		getMessagesLimit(urls[0], *metricsNum)
+		getMessagesLimit(urls[0], *metricsNum, *pprofileFileName != "")
 		return
 	} else if *modeString != "simulate" {
-		fmt.Fprintln(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
+		fmt.Fprintf(os.Stderr, "Invalid mode string (simulate/limit): %s", *modeString)
 		return
 	}
 
