@@ -71,16 +71,16 @@ func main() {
 	for {
 		select {
 		case event := <-amqpEventServer.GetNotifier():
-			log.Printf("Event occured : %#v\n", event)
+			//log.Printf("Event occured : %#v\n", event)
 			indexName, indexType, err := saelastic.GetIndexNameType(event)
 			if err != nil {
-				log.Fatalf("Failed to read event type in main %s\n", err)
+				log.Printf("Failed to read event %s type in main %s\n", event,err)
 			} else {
 				id, err := elasticClient.Create(indexName, indexType, event)
 				if err != nil {
-					log.Fatalf("Error sending events to elastic search %s", err)
+					log.Printf("Error creating event %s in elastic search %s\n", event, err)
 				} else {
-					log.Printf("Document created in elasticsearch for mapping: %s ,type: %s, id :%s", string(indexName), string(indexType), id)
+					log.Printf("Document created in elasticsearch for mapping: %s ,type: %s, id :%s\n", string(indexName), string(indexType), id)
 				}
 
 			}

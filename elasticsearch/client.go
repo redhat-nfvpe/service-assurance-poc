@@ -19,31 +19,32 @@ type IndexType string
 const (
 	CONNECTIVITYINDEX IndexName = "connectivity"
   PROCEVENTINDEX IndexName = "procevent"
-  SYSLOGINDEX IndexName = "syslogs"
+  SYSEVENTINDEX IndexName = "syslogs"
   GENERICINDEX IndexName = "generic"
 )
 //Index Type
 const (
 	CONNECTIVITYINDEXTYPE IndexType = "event"
   PROCEVENTINDEXTYPE IndexType = "event"
+	SYSEVENTINDEXTYPE IndexType = "event"
   GENERICINDEXTYPE IndexType = "event"
 )
-//Client  ....
-type SAElasticClient struct {
+//ElasticClient  ....
+type ElasticClient struct {
 	client *elastic.Client
   ctx context.Context
   err error
 
 }
 //InitAllMappings ....
-func (ec * SAElasticClient) InitAllMappings(){
+func (ec * ElasticClient) InitAllMappings(){
   ec.CreateIndex(CONNECTIVITYINDEX,saelastic.ConnectivityMapping)
 }
 
 //CreateClient   ....
-func CreateClient(elastichost string) *SAElasticClient {
+func CreateClient(elastichost string) *ElasticClient {
 	//c, _ = client.New(client.WithHosts([]string{"https://elasticsearch:9200"}))
-	var elasticClient *SAElasticClient
+	var elasticClient *ElasticClient
 	//var eClient *elastic.Client
 	eclient, err := elastic.NewClient(elastic.SetURL(elastichost))
 	if err != nil {
@@ -51,13 +52,13 @@ func CreateClient(elastichost string) *SAElasticClient {
     elasticClient.err=err
     return elasticClient
 	}
-	elasticClient = &SAElasticClient{client: eclient,ctx:context.Background()}
+	elasticClient = &ElasticClient{client: eclient,ctx:context.Background()}
   elasticClient.InitAllMappings()
 	return elasticClient
 }
 
 //CreateIndex  ...
-func (ec *SAElasticClient) CreateIndex(index IndexName,mapping string) {
+func (ec *ElasticClient) CreateIndex(index IndexName,mapping string) {
 
 	exists, err := ec.client.IndexExists(string(index)).Do(ec.ctx)
 	if err != nil {
@@ -85,13 +86,13 @@ func genUUIDv4() string {
   return id.String()
 }
 
-//Create...  it can be BodyJson or BodyString.. BodyJson needs struct defined
-func (ec *SAElasticClient) Create(indexname IndexName,indextype IndexType,jsondata string) (string, error) {
+//Create ...  it can be BodyJson or BodyString.. BodyJson needs struct defined
+func (ec *ElasticClient) Create(indexname IndexName,indextype IndexType,jsondata string) (string, error) {
   ctx :=ec.ctx
   id:=genUUIDv4()
   body:=Sanitize(jsondata)
   log.Printf("Printing body %s\n",body)
-  put2, err := ec.client.Index().
+  result, err := ec.client.Index().
   		Index(string(indexname)).
   		Type(string(indextype)).
   		Id(id).
@@ -101,7 +102,7 @@ func (ec *SAElasticClient) Create(indexname IndexName,indextype IndexType,jsonda
   		// Handle error
   		return id,err
   	}
-  	log.Printf("Indexed  %s to index %s, type %s\n", put2.Id, put2.Index, put2.Type)
+  	log.Printf("Indexed  %s to index %s, type %s\n", result.Id, result.Index, result.Type)
     // Flush to make sure the documents got written.
     // Flush asks Elasticsearch to free memory from the index and
     // flush data to disk.
@@ -111,12 +112,12 @@ func (ec *SAElasticClient) Create(indexname IndexName,indextype IndexType,jsonda
 }
 
 //Update ....
-func (ec *SAElasticClient) Update() {
+func (ec *ElasticClient) Update() {
 
 }
 
-//Delete
-func (ec *SAElasticClient) DeleteIndex(index IndexName) error {
+//DeleteIndex ...
+func (ec *ElasticClient) DeleteIndex(index IndexName) error {
   // Delete an index.
   	deleteIndex, err := ec.client.DeleteIndex(string(index)).Do(ec.ctx)
   	if err != nil {
@@ -132,7 +133,7 @@ func (ec *SAElasticClient) DeleteIndex(index IndexName) error {
 
 
 //Delete  ....
-func (ec *SAElasticClient) Delete(indexname IndexName,indextype IndexType,id string) error {
+func (ec *ElasticClient) Delete(indexname IndexName,indextype IndexType,id string) error {
   // Get tweet with specified ID
 
 	_,err := ec.client.Delete().
@@ -144,7 +145,7 @@ func (ec *SAElasticClient) Delete(indexname IndexName,indextype IndexType,id str
 }
 
 //Get  ....
-func (ec *SAElasticClient) Get(indexname IndexName,indextype IndexType,id string)(*elastic.GetResult,error) {
+func (ec *ElasticClient) Get(indexname IndexName,indextype IndexType,id string)(*elastic.GetResult,error) {
   // Get tweet with specified ID
 
 	result,err := ec.client.Get().
@@ -166,7 +167,7 @@ func (ec *SAElasticClient) Get(indexname IndexName,indextype IndexType,id string
 }
 
 //Search  ..
-func (ec *SAElasticClient) Search(indexname string) *elastic.SearchResult {
+func (ec *ElasticClient) Search(indexname string) *elastic.SearchResult {
   // Search with a term
 
 	termQuery := elastic.NewTermQuery("user", "olivere")

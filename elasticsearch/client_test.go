@@ -36,7 +36,7 @@ func TestSanitize(t *testing.T) {
 
 
 func TestClient(t *testing.T) {
-var client *SAElasticClient
+var client *ElasticClient
 client=CreateClient(elastichost)
 if client.err != nil{
   	t.Errorf("Failed to connect to elastic search%s", client.err)
@@ -44,7 +44,7 @@ if client.err != nil{
 }
 
 func TestIndexCreateAndDelete(t *testing.T) {
-  var client *SAElasticClient
+  var client *ElasticClient
   client=CreateClient(elastichost)
   if client.err != nil{
     	t.Errorf("Failed to connect to elastic search%s", client.err)
@@ -71,7 +71,7 @@ func TestIndexCreateAndDelete(t *testing.T) {
 }
 
 func TestConnectivityDataCreate(t *testing.T) {
-  var client *SAElasticClient
+  var client *ElasticClient
   client=CreateClient(elastichost)
   if client.err != nil{
       t.Errorf("Failed to connect to elastic search%s", client.err)

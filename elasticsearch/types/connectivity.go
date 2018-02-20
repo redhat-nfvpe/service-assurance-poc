@@ -3,7 +3,8 @@ import (
   "time"
 )
 /** generated using https://mholt.github.io/json-to-go*/
-//Connectivity.....
+
+//Connectivity .....
 type Connectivity []struct {
 	Labels struct {
 		Alertname    string `json:"alertname"`
