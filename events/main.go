@@ -65,7 +65,7 @@ func main() {
 	///Metric Listener
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
 	amqpEventServer = amqplistener.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
-	var elasticClient *saelastic.SAElasticClient
+	var elasticClient *saelastic.ElasticClient
 	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL)
 
 	for {

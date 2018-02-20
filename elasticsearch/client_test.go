@@ -55,7 +55,7 @@ func TestIndexCreateAndDelete(t *testing.T) {
       return
   	}
 
-    err=client.DeleteIndex(indexName)
+    client.DeleteIndex(indexName)
 
     client.CreateIndex(indexName, saelastic.ConnectivityMapping)
     exists, err := client.client.IndexExists(string(indexName)).Do(client.ctx)
