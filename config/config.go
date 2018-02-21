@@ -7,6 +7,8 @@ import (
 //EventConfiguration  ...
 type EventConfiguration struct {
   AMQP1EventURL    string
+  ElasticHostURL   string
+
 }
 //MetricConfiguration   ....
 type MetricConfiguration struct {

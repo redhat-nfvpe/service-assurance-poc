@@ -2,53 +2,15 @@ package main
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
-	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
+	"github.com/redhat-nfvpe/service-assurance-poc/elasticsearch"
 
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"time"
 )
-
-var (
-	lastPull = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "sa_collectd_last_pull_timestamp_seconds",
-			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
-		},
-	)
-)
-
-/*************** HTTP HANDLER***********************/
-type cacheHandler struct {
-	cache *cacheutil.IncomingDataCache
-}
-
-// Describe implements prometheus.Collector.
-func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
-	ch <- lastPull.Desc()
-}
-
-// Collect implements prometheus.Collector.
-//need improvement add lock etc etc
-func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
-	for _, plugin := range c.cache.GetHosts() {
-		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
-	}
-
-	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
-	ch <- lastPull
-
-	for _, plugin := range c.cache.GetHosts() {
-		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
-	}
-}
 
 /*************** main routine ***********************/
 // Usage and command-line flags
@@ -60,7 +22,7 @@ func usage() {
 	**************************************************
 	For running with AMQP and Prometheus use following option
 	********************* Production *********************
-	$go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify
+	$go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify -eshost=http://10.19.110.5:9200
 	**************************************************************`)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
 	fmt.Fprintln(os.Stdout, doc)
@@ -73,6 +35,7 @@ func main() {
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
 
 	fAMQP1EventURL := flag.String("amqp1EventURL", "", "AMQP1.0 events listener example 127.0.0.1:5672/collectd/notify")
+	fElasticHostURL := flag.String("eshost", "", "elasticsearch host http://localhost:9200")
 
 	flag.Parse()
 	var serverConfig saconfig.EventConfiguration
@@ -81,6 +44,7 @@ func main() {
 	} else {
 		serverConfig = saconfig.EventConfiguration{
 			AMQP1EventURL: *fAMQP1EventURL,
+			ElasticHostURL: *fElasticHostURL,
 		}
 
 	}
@@ -90,17 +54,36 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+	if len(serverConfig.ElasticHostURL) == 0 {
+		log.Println("Elastic Host URL is required")
+		usage()
+		os.Exit(1)
+	}
 
 	eventsNotifier := make(chan string) // Channel for messages from goroutines to main()
 	var amqpEventServer *amqplistener.AMQPServer
 	///Metric Listener
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
 	amqpEventServer = amqplistener.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
+	var elasticClient *saelastic.ElasticClient
+	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL)
 
 	for {
 		select {
 		case event := <-amqpEventServer.GetNotifier():
-			log.Printf("Event occured : %#v\n", event)
+			//log.Printf("Event occured : %#v\n", event)
+			indexName, indexType, err := saelastic.GetIndexNameType(event)
+			if err != nil {
+				log.Printf("Failed to read event %s type in main %s\n", event,err)
+			} else {
+				id, err := elasticClient.Create(indexName, indexType, event)
+				if err != nil {
+					log.Printf("Error creating event %s in elastic search %s\n", event, err)
+				} else {
+					log.Printf("Document created in elasticsearch for mapping: %s ,type: %s, id :%s\n", string(indexName), string(indexType), id)
+				}
+
+			}
 			continue
 		default:
 			//no activity

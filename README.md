@@ -147,7 +147,7 @@ Follow error message to run "$go get dependencies"
 
 **For running EVENTS with AMQP  use following option.**
 ```
-$go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify
+$go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify -eshost=http://10.19.110.5:9200
 ```
 
 **With configuration file.**
