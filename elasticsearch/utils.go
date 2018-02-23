@@ -28,22 +28,49 @@ func Sanitize(jsondata string) string {
 }
 
 //GetIndexNameType ...
-func GetIndexNameType(jsondata string) (IndexName, IndexType, error) {
+func GetIndexNameType(jsondata string) (string, IndexType, error) {
 	start := time.Now()
 
 	var f []interface{}
 	err := json.Unmarshal([]byte(jsondata), &f)
 	if err != nil {
 		log.Fatal(err)
-		return GENERICINDEX, GENERICINDEXTYPE, err
+		return string(GENERICINDEX), GENERICINDEXTYPE, err
 	}
 	elapsed := time.Since(start)
-	index, indextype, error := typeSwitch(f[0])
+	index, indextype, error := typeSwitchAlertname(f[0])
 	log.Printf("getIndexNameType took %s", elapsed)
 	return index, indextype, error
 
 }
 
+func typeSwitchAlertname(tst interface{}) (string, IndexType, error) {
+	switch v := tst.(type) {
+	case map[string]interface{}:
+		if val, ok := v["labels"]; ok {
+			switch val.(type) {
+			case map[string]interface{}:
+				if rec, ok := val.(map[string]interface{}); ok {
+					if value, ok := rec["alertname"].(string); ok {
+						index := strings.LastIndex(value, "_")
+						if index > len("collectd_") {
+							return value[0:index], EVENTINDEXTYPE, nil
+						}
+						return value, EVENTINDEXTYPE, nil
+					}
+					//else
+					return string(GENERICINDEX), GENERICINDEXTYPE, nil
+				} //else
+				return string(GENERICINDEX), GENERICINDEXTYPE, nil
+			}
+		}
+	default:
+		return string(GENERICINDEX), GENERICINDEXTYPE, nil
+	}
+	return string(GENERICINDEX), GENERICINDEXTYPE, nil
+}
+
+// Not used
 func typeSwitch(tst interface{}) (IndexName, IndexType, error) {
 	switch v := tst.(type) {
 	case map[string]interface{}:
@@ -52,11 +79,11 @@ func typeSwitch(tst interface{}) (IndexName, IndexType, error) {
 			case map[string]interface{}:
 				if rec, ok := val.(map[string]interface{}); ok {
 					if _, ok := rec["connectivity"]; ok {
-						return CONNECTIVITYINDEX, CONNECTIVITYINDEXTYPE, nil
+						return CONNECTIVITYINDEX, EVENTINDEXTYPE, nil
 					} else if _, ok := rec["procevent"]; ok {
-						return PROCEVENTINDEX, PROCEVENTINDEXTYPE, nil
+						return PROCEVENTINDEX, EVENTINDEXTYPE, nil
 					} else if _, ok := rec["sysevent"]; ok {
-						return SYSEVENTINDEX, SYSEVENTINDEXTYPE, nil
+						return SYSEVENTINDEX, EVENTINDEXTYPE, nil
 					}
 					//else
 					return GENERICINDEX, GENERICINDEXTYPE, nil
