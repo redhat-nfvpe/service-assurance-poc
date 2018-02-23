@@ -12,27 +12,56 @@ const ConnectivityMapping = `
                "properties": {
                   "alertname": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                           "ignore_above":	256
+                          }
+                        }
                   },
                   "instance": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword"
+                          }
+                        }
                   },
                   "connectivity": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                          "ignore_above":	256
+                          }
+                        }
                   },
                   "type": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                           "ignore_above":	256
+                          }
+                        }
                   },
                   "severity": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                           "ignore_above":	256
+                          }
+                        }
                   },
                   "service": {
                      "type": "text",
-                     "index": true
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                           "ignore_above":	256
+                          }
+                        }
                   }
                }
             },
@@ -41,56 +70,85 @@ const ConnectivityMapping = `
                "properties": {
                   "summary": {
                      "type": "text",
-                     "index": false
+                     "fields": {
+                          "keyword": {
+                          "type": "keyword",
+                           "ignore_above":	256
+                          }
+                        }
                   },
                   "ves": {
                      "type": "object",
                      "properties": {
                         "domain": {
                            "type": "text",
-                            "index": true
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "stateChange": {
                            "type": "text",
-                            "index": true
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "eventId": {
-                           "type": "text",
-                           "index": false
+                           "type": "long"
                         },
                         "eventName": {
                            "type": "text",
-                            "index": true
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "lastEpochMicrosec": {
-                           "type": "date",
-                           "format": "strict_date_optional_time||epoch_millis"
-
+                           "type": "long"
                         },
                         "priority": {
                            "type": "text",
-                            "index": false
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "reportingEntityName": {
                            "type": "text",
-                           "index": true
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "sequence": {
-                           "type": "integer",
-                           "index": false
+                           "type": "long"
                         },
                         "sourceName": {
                            "type": "text",
-                            "index": true
+                           "fields": {
+                                "keyword": {
+                                "type": "keyword",
+                                 "ignore_above":	256
+                                }
+                              }
                         },
                         "startEpochMicrosec": {
-                           "type": "date",
-                           "format": "strict_date_optional_time||epoch_millis"
+                           "type": "long"
 
                         },
                         "version": {
-                           "type": "float",
-                           "index":false
+                           "type": "float"
                         },
                         "stateChangeFields": {
                            "type": "object",
@@ -101,12 +159,15 @@ const ConnectivityMapping = `
                               },
                               "oldState": {
                                   "type": "text",
-                                   "index": true
+                                  "fields": {
+                                       "keyword": {
+                                       "type": "keyword",
+                                        "ignore_above":	256
+                                       }
+                                     }
                               },
                               "stateChangeFieldsVersion": {
-                                 "type": "float",
-                                 "index": false
-
+                                 "type": "float"
                               }
                            }
                         }

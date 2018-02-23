@@ -28,9 +28,9 @@ $ go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=1
 ******[2  Running Events ]******************************
 *  For running with config file use                  *
 ********************* config *************************
-$ go run events/main.go -config sa.config.json
+$ go run events/main.go -config sa.events.config.json
 **********************Command line **********************************
-$ go run events/main.go --amqpqEventURL=10.19.110.5:5672/collectd/notify
+$ go run events/main.go --amqpqEventURL=10.19.110.5:5672/collectd/notify -eshost=http://10.19.110.5:9200
 **********************************************************
 `)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
