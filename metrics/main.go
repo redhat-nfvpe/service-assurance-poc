@@ -86,7 +86,7 @@ func main() {
 	fAMQP1MetricURL := flag.String("amqp1MetricURL", "", "AMQP1.0 metrics listener example 127.0.0.1:5672/collectd/telemetry")
 	fCount := flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
 
-	fSampledata := flag.Bool("usesample", false, "Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)")
+	fSampledata := flag.Bool("usesample", false, "Use sample data instead of amqp.This will not fetch any data from amqp (OPTIONAL)")
 	fHosts := flag.Int("h", 1, "No of hosts : Sample hosts required (default 1).")
 	fPlugins := flag.Int("p", 100, "No of plugins: Sample plugins per host(default 100).")
 	fIterations := flag.Int("t", 1, "No of times to run sample data (default 1) -1 for ever.")
