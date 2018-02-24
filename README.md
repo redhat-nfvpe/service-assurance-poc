@@ -30,11 +30,11 @@ git merge upstream/master
 
 ## Service Assurance Smart Agent POC
 - Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
-- Runnng a SA-Smart Agent Service will start 3 services
+- Running a SA-Smart Agent Service will start 3 services
 	- qpid router listener, to consume all incoming collectd json
 	- http server to expose metrics from collectd for Prometheus to scrape.
-	- CacheServer to cach all incoming data from amqp1.0 plugin
-##### Requirment.
+	- CacheServer to cache all incoming data from amqp1.0 plugin
+##### Requirement.
 
 - Install barometer,  amqp1.0 dispatcher and Prometheus .
 
@@ -92,15 +92,10 @@ LoadPlugin amqp1
   </Transport>
 </Plugin>
 ```
-**:scream://Didn’t add qpid proton link. Instead of building the pakcage, choose to do yum install.**
-
-**:thought_balloon:During testing qpid proton verson 0.18.1 wast not available in release repo . Hence used test repo**
-
 - **Change2 file: https://github.com/aneeshkp/barometer/blob/f40a5bb86d77351f1cbe543fc08b75fc92ea4418/src/collectd/Makefile**
 ```
-$(AT)sudo yum install -y qpid-proton-c-devel-0.18.1-1.el7.x86_64 --enablerepo=epel-testing
+$(AT)sudo yum install -y qpid-proton-c-devel-0.18.2-1.el7.x86_64
 ```
-
 - **Change 3 :https://github.com/aneeshkp/barometer/blob/master/docker/Dockerfile**
 ```
 
@@ -122,7 +117,7 @@ docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.co
 ```
 **Here `pwd`/collect_config contains all collectd configuration files. Enable and disable plugin under this directory**
 
-##### QPID Dispatcher installation (Read setting up standalone qpid-ansible readme file. )
+##### QPID Dispatcher installation (Read setting up standalone qpid-ansible read-me file. )
 ```
 - Git clone https://github.com/aneeshkp/qpid-ansible
 - Cd qpid-ansible
@@ -132,8 +127,8 @@ docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.co
 - ansible-playbook -i hosts main.yaml --tags config-standalone,router,start,status --limit standalone
 ```
 ##### Prometheus Installation
-Read Prometheus installtion [Prometheus installation](https://prometheus.io/docs/prometheus/latest/installation/)
-Set the target in prometheus yml to scrap available metrics port (see Smart Agent Usage for port).
+Read Prometheus installation [Prometheus installation](https://prometheus.io/docs/prometheus/latest/installation/)
+Set the target in Prometheus yaml to scrap available metrics port (see Smart Agent Usage for port).
 ##### Service Assurance Smart Agent installation
 ```
 Git clone https://github.com/redhat-nfvpe/service-assurance-poc.git
@@ -168,7 +163,7 @@ $go run events/metrics.go --config sa.metrics.congig.json
 
 ```
 ---
-**For running metrics with Sample data,  wihout AMQP use the following option.**
+**For running metrics with Sample data,  without AMQP use the following option.**
 
 **Sample Data for metrics**
 
@@ -197,4 +192,4 @@ $go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=10
   -t int
     	No of times to run sample data (default 1) -1 for ever. (default 1)
   -usesample
-    	Use sample data instead of amqp.This wil not fetch any data from amqp (OPTIONAL)
+    	Use sample data instead of amqp.This will not fetch any data from amqp (OPTIONAL)
