@@ -1,51 +1,53 @@
 [![Build Status](https://travis-ci.org/redhat-nfvpe/service-assurance-poc.svg?branch=master)](https://travis-ci.org/redhat-nfvpe/service-assurance-poc) [![Go Report Card](https://goreportcard.com/badge/github.com/redhat-nfvpe/service-assurance-poc)](https://goreportcard.com/report/github.com/redhat-nfvpe/service-assurance-poc)
+
 ## Note about development
-- got to https://github.com/redhat-nfvpe/service-assurance-poc and fork it to your account
+- go to https://github.com/redhat-nfvpe/service-assurance-poc and fork it to
+  your account
 - Now in your environment run
-  - go get github.com/redhat-nfvpe/service-assurance-poc
--  and Navigate to the top level of the repository  service-assurance-poc
- ```
- cd to service-assurance-poc
- ```
+  - `go get github.com/redhat-nfvpe/service-assurance-poc`
+- and Navigate to the top level of the repository  service-assurance-poc
+  ```
+  cd to service-assurance-poc
+  ```
 
 - Rename the current origin remote to upstream
-```
-git remote rename origin upstream https://github.com/yourname/service-assurance-poc.git
-
-```
+  - `git remote rename origin upstream https://github.com/yourname/service-assurance-poc.git`
 - From here, the best approach would be to create a feature branch and work from there.
-```
-git checkout -t -b new-feature
-// create new feature commits
-git add files
-git commit -m "message"
-git push origin new-feature
-```
-- Don’t forget to pull the changes from upstream before sending in a PR. This helps avoid merge conflicts.
-```
-git fetch upstream
-git merge upstream/master
-```
-
+   ```
+   git checkout -t -b new-feature
+   // create new feature commits
+   git add files
+   git commit -m "message"
+   git push origin new-feature
+   ```
+- Don’t forget to pull the changes from upstream before sending in a PR. This
+  helps avoid merge conflicts.
+  ```
+  git fetch upstream
+  git merge upstream/master
+  ```
 
 ## Service Assurance Smart Agent POC
-- Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0 dispatcher.
+- Enabling Barometer with amqp1.0 plugin will write metrics to amqp1.0
+  dispatcher.
 - Running a SA-Smart Agent Service will start 3 services
-	- qpid router listener, to consume all incoming collectd json
-	- http server to expose metrics from collectd for Prometheus to scrape.
-	- CacheServer to cache all incoming data from amqp1.0 plugin
-##### Requirement.
+    - qpid router listener, to consume all incoming collectd json
+    - http server to expose metrics from collectd for Prometheus to scrape.
+    - CacheServer to cache all incoming data from amqp1.0 plugin
 
-- Install barometer,  amqp1.0 dispatcher and Prometheus .
+### Requirements
+
+- Install barometer, amqp1.0 dispatcher and Prometheus.
 
 ![alt text](docs/sa_smart_agent.png)
 
 ## Single node installation
 
-##### Barometer installation
+### Barometer installation
 
 **From Barometer User guide**:
-Read barometer docker user guide [barometer docker user guide](http://docs.opnfv.org/en/latest/submodules/barometer/docs/release/userguide/docker.userguide.html)
+Read barometer docker user guide [barometer docker user
+guide](http://docs.opnfv.org/en/latest/submodules/barometer/docs/release/userguide/docker.userguide.html)
 
 **Installing barometer collectd container WITHOUT AMQP plugin**
 - $ git clone https://gerrit.opnfv.org/gerrit/barometer
@@ -57,9 +59,11 @@ Read barometer docker user guide [barometer docker user guide](http://docs.opnfv
 
 **Applying AMQP1.0 plugin patch to build docker images**
 
-In order to apply AMQP1.0 plugin as patch for the docker image before building. I copied the project to public github and made following changes to the project
+In order to apply AMQP1.0 plugin as patch for the docker image before building.
+I copied the project to public github and made following changes to the project
 
-For reference see below. You can skip this section to "Build with AMQP1.0 plugin"
+For reference see below. You can skip this section to "Build with AMQP1.0
+plugin"
 - **Change 1 file: https://github.com/aneeshkp/barometer/blob/master/src/package-list.mk**
 ```
   +COLLECTD_AMQP1_PATCH_URL ?= https://github.com/collectd/collectd/pull/2618.patch
@@ -103,7 +107,8 @@ WORKDIR ${repos_dir}
 RUN git clone https://github.com/aneeshkp/barometer.git
 WORKDIR ${repos_dir}/barometer/systems
 ```
-##### Build with AMQP1.0 plugin
+
+### Build with AMQP1.0 plugin
 ```
 $ git clone https://github.com/aneeshkp/barometer.git
 $ cd barometer/docker/barometer-collectd
@@ -111,34 +116,38 @@ $ sudo docker build --no-cache -t opnfv/barometer-collectd --build-arg http_prox
   --build-arg https_proxy=`echo $https_proxy` -f Dockerfile .
 ```
 
-##### To Deploy Barometer container
+### To Deploy Barometer container
 ```
 docker run -tid --net=host -v `pwd`/collect_config:/opt/collectd/etc/collectd.conf.d  -v /var/run:/var/run -v /tmp:/tmp --privileged opnfv/barometer-collectd /run_collectd.sh
 ```
 **Here `pwd`/collect_config contains all collectd configuration files. Enable and disable plugin under this directory**
 
-##### QPID Dispatcher installation (Read setting up standalone qpid-ansible read-me file. )
+### QPID Dispatcher installation (Read setting up standalone qpid-ansible read-me file. )
 ```
-- Git clone https://github.com/aneeshkp/qpid-ansible
-- Cd qpid-ansible
+- git clone https://github.com/aneeshkp/qpid-ansible
+- cd qpid-ansible
 - change under hosts standalone server name
-	[standalone]
-	10.19.110.23
+    [standalone]
+    10.19.110.23
 - ansible-playbook -i hosts main.yaml --tags config-standalone,router,start,status --limit standalone
 ```
-##### Prometheus Installation
-Read Prometheus installation [Prometheus installation](https://prometheus.io/docs/prometheus/latest/installation/)
-Set the target in Prometheus yaml to scrap available metrics port (see Smart Agent Usage for port).
-##### Service Assurance Smart Agent installation
+### Prometheus Installation
+Read Prometheus installation [Prometheus
+installation](https://prometheus.io/docs/prometheus/latest/installation/) Set
+the target in Prometheus yaml to scrap available metrics port (see Smart Agent
+Usage for port).
+
+### Service Assurance Smart Agent installation
 ```
-Git clone https://github.com/redhat-nfvpe/service-assurance-poc.git
+git clone https://github.com/redhat-nfvpe/service-assurance-poc.git
 Set go environment.
 Follow error message to run "$go get dependencies"
 ```
-##### Smart Agent Usage
+
+### Smart Agent Usage
 ---
 **Test : Running Benchmark**
-- go test -bench=.
+- `go test -bench=.`
 
 **For running EVENTS with AMQP  use following option.**
 ```
@@ -146,7 +155,6 @@ $go run events/main.go -amqp1EventURL=10.19.110.5:5672/collectd/notify -eshost=h
 ```
 
 **With configuration file.**
-
 ```
 $go run events/main.go --config sa.event.congig.json
 
@@ -156,8 +164,8 @@ $go run events/main.go --config sa.event.congig.json
 ```
 $go run metrics/main.go -mhost=localhost -mport=8081 -amqp1MetricURL=10.19.110.5:5672/collectd/telemetry
 ```
-**With configuration file.**
 
+**With configuration file.**
 ```
 $go run events/metrics.go --config sa.metrics.congig.json
 
