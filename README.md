@@ -37,9 +37,11 @@
 
 ### Requirements
 
-- Install barometer, amqp1.0 dispatcher and Prometheus.
+- Install barometer, amqp1.0 dispatcher,Prometheus and Elastic Search.
 
 ![alt text](docs/sa_smart_agent.png)
+![alt text](docs/smartagentsetup.png)
+
 
 ## Single node installation
 
