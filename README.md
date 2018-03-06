@@ -41,7 +41,7 @@
 
 ![alt text](docs/sa_smart_agent.png)
 ![alt text](docs/smartagentsetup.png)
-
+![alt text](docs/scale_as_group.png)
 
 ## Single node installation
 
