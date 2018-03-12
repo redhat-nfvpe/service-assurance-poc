@@ -1,0 +1,14 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: prometheus-sa
+  namespace: sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-sa
+subjects:
+- kind: ServiceAccount
+  name: prometheus-sa
+  namespace: sa
