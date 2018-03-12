@@ -1,0 +1,54 @@
+---
+# install PromOps
+- name: Create directory to hold templates
+  file:
+    state: directory
+    path: "{{ ansible_env.HOME }}/smartagent_tmpl/"
+
+- name: Copy over static manifests
+  copy:
+    src: smartagent/
+    dest: "{{ ansible_env.HOME }}/smartagent_tmpl"
+
+- name: Get current namespaces
+  command: kubectl get namespaces -o go-template={% raw %}'{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}'{% endraw %}
+  register: k8s_namespaces
+  changed_when: false
+
+- name: Create namespace
+  command: kubectl create namespace {{ promops_deploy.namespace }}
+  when: promops_deploy.namespace not in k8s_namespaces.stdout_lines
+
+- name: Deploy Prometheus Operator
+  command: kubectl -n {{ promops_deploy.namespace }} apply -f prometheus-operator/
+  args:
+    chdir: "{{ ansible_env.HOME }}/smartagent_tmpl"
+  ignore_errors: true
+
+- name: Wait for Custom Resource Definitions to be available
+  shell: kubectl get customresourcedefinition {{ item }}.monitoring.coreos.com > /dev/null 2>&1
+  register: crd_check
+  until: crd_check.rc == 0
+  retries: 30
+  delay: 1
+  with_items:
+    - servicemonitors
+    - prometheuses
+  changed_when: false
+
+- name: Deploy primary components
+  command: kubectl -n {{ promops_deploy.namespace }} apply -f {{ item }}
+  args:
+    chdir: "{{ ansible_env.HOME }}/smartagent_tmpl"
+  ignore_errors: true
+  with_items:
+    - grafana/grafana-credentials.yaml
+    - grafana
+    - prometheus
+    - metrics
+
+- name: Deploy Prometheus roles and bindings
+  command: kubectl apply -f prometheus-roles-bindings/
+  args:
+    chdir: "{{ ansible_env.HOME }}/smartagent_tmpl"
+  ignore_errors: true

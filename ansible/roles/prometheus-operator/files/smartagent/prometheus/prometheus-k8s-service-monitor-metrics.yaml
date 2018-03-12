@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metrics
+  labels:
+    sa-app: metrics
+spec:
+  selector:
+    matchLabels:
+      sa-app: metrics
+  namespaceSelector:
+    matchNames:
+    - sa
+  endpoints:
+  - port: metrics
+    interval: 30s
