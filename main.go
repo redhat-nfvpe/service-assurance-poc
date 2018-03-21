@@ -15,7 +15,7 @@ func usage() {
 ******[1 Running Metrics ]**************************************
 *For running with config file use                             *
 ********************* config **********************************
-$go run metrics/main.go -config sa.config.json
+$go run metrics/main.go -config sa.metrics.config.json
 ***************************************************************
 * For running with AMQP and Prometheus use following option   *
 ********************* Command Line ****************************
@@ -30,7 +30,7 @@ $ go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=1
 ********************* config *************************
 $ go run events/main.go -config sa.events.config.json
 **********************Command line **********************************
-$ go run events/main.go --amqpqEventURL=10.19.110.5:5672/collectd/notify -eshost=http://10.19.110.5:9200
+$ go run events/main.go --amqp1EventURL=10.19.110.5:5672/collectd/notify -eshost=http://10.19.110.5:9200
 **********************************************************
 `)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
