@@ -66,7 +66,7 @@ ansible-playbook -i inventory/sa/virthost.local \
     playbooks/virthost-setup.yml
 
 ansible-playbook -i inventory/vms.local.generated \
-    -e “@./inventory/sa/vars.yml” \
+    -e "@./inventory/sa/vars.yml" \
     -e "ssh_proxy_host=$REMOTE_HOST" \
     -e "vm_ssh_key_path=$HOME/.ssh/$KEYNAME" \
     playbooks/kube-install.yml \
