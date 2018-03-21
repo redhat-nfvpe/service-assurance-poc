@@ -52,7 +52,6 @@ mkdir -p ~/src/sa-development
 cd ~/src/sa-development
 git clone https://github.com/redhat-nfvpe/kube-ansible
 cd kube-ansible
-git checkout develop
 ansible-galaxy install -r requirements.yml
 git clone https://github.com/$FORK/sa-inventory ./inventory/sa
 
