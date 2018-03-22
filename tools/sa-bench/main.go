@@ -25,13 +25,14 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"qpid.apache.org/amqp"
-	"qpid.apache.org/electron"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"qpid.apache.org/amqp"
+	"qpid.apache.org/electron"
 )
 
 func usage() {

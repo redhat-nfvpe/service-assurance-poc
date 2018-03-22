@@ -2,10 +2,11 @@ package cacheutil
 
 import (
 	"fmt"
-	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 )
 
 // MAXTTL to remove plugin is stale for 5

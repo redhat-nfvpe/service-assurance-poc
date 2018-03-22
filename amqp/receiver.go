@@ -24,9 +24,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
-	"strings"
 	//  "reflect"
 )
 
