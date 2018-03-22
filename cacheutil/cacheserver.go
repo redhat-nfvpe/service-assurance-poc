@@ -1,11 +1,12 @@
 package cacheutil
 
 import (
+	"log"
+	"sync"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 	"github.com/redhat-nfvpe/service-assurance-poc/tsdb"
-	"log"
-	"sync"
 
 	//"errors"
 	"fmt"

@@ -112,7 +112,7 @@ func main() {
 
 	}
 
-	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL)==0) {
+	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL) == 0) {
 		log.Println("AMQP1 Metrics URL is required")
 		usage()
 		os.Exit(1)
@@ -184,19 +184,19 @@ func main() {
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		amqpMetricServer = amqplistener.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
 
-	for {
-		 select {
-		 case data := <-amqpMetricServer.GetNotifier():
-			 //fmt.Printf("%v",data)
-			 incomingType := incoming.NewInComing(incoming.COLLECTD)
-			 incomingType.ParseInputJSON(data)
-			 cacheServer.Put(incomingType)
-			 continue
-		 default:
-			 //no activity
-		 }
-	 }
- }
+		for {
+			select {
+			case data := <-amqpMetricServer.GetNotifier():
+				//fmt.Printf("%v",data)
+				incomingType := incoming.NewInComing(incoming.COLLECTD)
+				incomingType.ParseInputJSON(data)
+				cacheServer.Put(incomingType)
+				continue
+			default:
+				//no activity
+			}
+		}
+	}
 	//TO DO: to close cache server on keyboard interrupt
 
 }

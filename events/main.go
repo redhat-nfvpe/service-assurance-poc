@@ -43,7 +43,7 @@ func main() {
 		serverConfig = saconfig.LoadEventConfig(*fConfigLocation)
 	} else {
 		serverConfig = saconfig.EventConfiguration{
-			AMQP1EventURL: *fAMQP1EventURL,
+			AMQP1EventURL:  *fAMQP1EventURL,
 			ElasticHostURL: *fElasticHostURL,
 		}
 
@@ -74,7 +74,7 @@ func main() {
 			//log.Printf("Event occured : %#v\n", event)
 			indexName, indexType, err := saelastic.GetIndexNameType(event)
 			if err != nil {
-				log.Printf("Failed to read event %s type in main %s\n", event,err)
+				log.Printf("Failed to read event %s type in main %s\n", event, err)
 			} else {
 				id, err := elasticClient.Create(indexName, indexType, event)
 				if err != nil {

@@ -25,13 +25,14 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"qpid.apache.org/amqp"
-	"qpid.apache.org/electron"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"qpid.apache.org/amqp"
+	"qpid.apache.org/electron"
 )
 
 func usage() {
@@ -79,17 +80,17 @@ func (m *plugin) GetMetricMessage(nthSend int, msgInJSON int) (msg string) {
 	msgBuffer = append(msgBuffer, "]"...)
 	return string(msgBuffer)
 	/*
-		msgTemplate := `
-	[{"values": [%f], "dstypes": ["derive"], "dsnames": ["samples"],
-	"time": %f, "interval": 10, "host": "%s", "plugin": "testPlugin",
-	"plugin_instance": "testInstance","type": "%v","type_instance": ""}]
-	`
-		msg = fmt.Sprintf(msgTemplate,
-			rand.Float64(),                           // val
-			float64((time.Now().UnixNano()))/1000000000, // time
-			*m.hostname,                              // host
-			m.name)                                   // type
-		return
+			msgTemplate := `
+		[{"values": [%f], "dstypes": ["derive"], "dsnames": ["samples"],
+		"time": %f, "interval": 10, "host": "%s", "plugin": "testPlugin",
+		"plugin_instance": "testInstance","type": "%v","type_instance": ""}]
+		`
+			msg = fmt.Sprintf(msgTemplate,
+				rand.Float64(),                           // val
+				float64((time.Now().UnixNano()))/1000000000, // time
+				*m.hostname,                              // host
+				m.name)                                   // type
+			return
 	*/
 }
 
@@ -113,7 +114,7 @@ func getMessagesLimit(urls string, metricsInAmqp int, enableCPUProfile bool) {
 	dummyHost := "testHost"
 	dummyPlugin := &plugin{
 		hostname: &dummyHost,
-		name: "testPlugin",
+		name:     "testPlugin",
 		interval: 10,
 	}
 
@@ -193,10 +194,10 @@ func getMessagesLimit(urls string, metricsInAmqp int, enableCPUProfile bool) {
 	}
 	os.Exit(0)
 	/*
-	close(cancelMesg)
-	close(cancel)
-	waitb.Wait()
-	con.Close(nil)
+		close(cancelMesg)
+		close(cancel)
+		waitb.Wait()
+		con.Close(nil)
 	*/
 }
 
@@ -347,5 +348,5 @@ func main() {
 	finishedTime := time.Now()
 	duration := finishedTime.Sub(startTime)
 	fmt.Printf("Total: %d sent (duration:%v, mesg/sec: %v, metric/sec: %v)\n",
-		countSent, duration, float64(countSent)/duration.Seconds(), float64(countSent * *metricsNum)/duration.Seconds())
+		countSent, duration, float64(countSent)/duration.Seconds(), float64(countSent**metricsNum)/duration.Seconds())
 }
