@@ -51,12 +51,13 @@ type AMQPServer struct {
 }
 
 //MockAmqpServer  Create Mock AMQP server
-func MockAmqpServer(notifier chan string) *AMQPServer{
+func MockAmqpServer(notifier chan string) *AMQPServer {
 	server := &AMQPServer{
-		notifier:    notifier,
+		notifier: notifier,
 	}
 	return server
 }
+
 //NewAMQPServer   ...
 func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string) *AMQPServer {
 	if len(urlStr) == 0 {

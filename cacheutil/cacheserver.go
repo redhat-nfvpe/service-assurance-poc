@@ -1,16 +1,15 @@
 package cacheutil
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"fmt"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
-	"github.com/redhat-nfvpe/service-assurance-poc/tsdb"
 	"log"
 	"sync"
-
-	//"errors"
-	"fmt"
+	"time"
 )
 
+// MAXTTL to remove plugin is stale for 5
+var MAXTTL int64 = 300
 var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
 
@@ -22,38 +21,62 @@ type IncomingBuffer struct {
 
 //IncomingDataCache cache server converts it into this
 type IncomingDataCache struct {
-	hosts map[string]*ShardedIncomingDataCache
-	lock  *sync.RWMutex
+	hosts  map[string]*ShardedIncomingDataCache
+	maxTTL int64
+	lock   *sync.RWMutex
 }
 
 //ShardedIncomingDataCache types of sharded cache collectd, influxdb etc
 //ShardedIncomingDataCache  ..
 type ShardedIncomingDataCache struct {
-	plugin map[string]incoming.DataTypeInterface
-	lock   *sync.RWMutex
+	plugin     map[string]incoming.DataTypeInterface
+	lastAccess int64
+	maxTTL     int64
+	lock       *sync.RWMutex
 }
 
 //NewCache   .. .
-func NewCache() IncomingDataCache {
+func NewCache(maxttl int64) IncomingDataCache {
+	if maxttl == 0 {
+		maxttl = MAXTTL
+	}
 	return IncomingDataCache{
-		hosts: make(map[string]*ShardedIncomingDataCache),
-		lock:  new(sync.RWMutex),
+		hosts:  make(map[string]*ShardedIncomingDataCache),
+		maxTTL: maxttl,
+		lock:   new(sync.RWMutex),
 	}
 }
 
 //NewShardedIncomingDataCache   .
-func NewShardedIncomingDataCache() *ShardedIncomingDataCache {
+func NewShardedIncomingDataCache(maxttl int64) *ShardedIncomingDataCache {
 	return &ShardedIncomingDataCache{
 		plugin: make(map[string]incoming.DataTypeInterface),
+		maxTTL: maxttl,
 		lock:   new(sync.RWMutex),
 	}
+
+}
+
+//FlushAll Flush raw meterics data
+func (i *IncomingDataCache) FlushAll() {
+	allHosts := i.GetHosts()
+	for key, plugin := range allHosts {
+		//fmt.Fprintln(w, hostname)
+		plugin.FlushAllMetrics()
+		//this will clean up all zero plugins
+		if plugin.Size() == 0 {
+			delete(allHosts, key)
+			log.Printf("Cleaned up host for %s", key)
+		}
+	}
+
 }
 
 //Put   ..
 func (i IncomingDataCache) Put(key string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	i.hosts[key] = NewShardedIncomingDataCache()
+	i.hosts[key] = NewShardedIncomingDataCache(i.maxTTL)
 }
 
 //GetHosts  Get All hosts
@@ -61,6 +84,20 @@ func (i IncomingDataCache) GetHosts() map[string]*ShardedIncomingDataCache {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	return i.hosts
+}
+
+//GetLastAccess ..Get lastt access time ...
+func (shard *ShardedIncomingDataCache) GetLastAccess() int64 {
+	return shard.lastAccess
+}
+
+//Expired  ... add expired test
+func (shard *ShardedIncomingDataCache) Expired() bool {
+	//clean up if data is not access for max TTL specified
+	if time.Now().Unix()-shard.GetLastAccess() > int64(shard.maxTTL) {
+		return true
+	}
+	return false
 }
 
 //GetShard  ..
@@ -106,6 +143,7 @@ func (shard *ShardedIncomingDataCache) SetData(data incoming.DataTypeInterface) 
 		//TODO: change this to more generic later
 		shard.plugin[data.GetItemKey()] = incoming.NewInComing(incoming.COLLECTD)
 	}
+	shard.lastAccess = time.Now().Unix()
 	collectd := shard.plugin[data.GetItemKey()]
 	collectd.SetData(data)
 	return nil
@@ -126,9 +164,9 @@ func (cs *CacheServer) GetCache() *IncomingDataCache {
 }
 
 //NewCacheServer   ...
-func NewCacheServer() *CacheServer {
+func NewCacheServer(maxTTL int64) *CacheServer {
 	server := &CacheServer{
-		cache: NewCache(),
+		cache: NewCache(maxTTL),
 		ch:    make(chan *IncomingBuffer),
 	}
 	// Spawn off the server's main loop immediately
@@ -150,27 +188,6 @@ func (cs *CacheServer) Put(incomingData incoming.DataTypeInterface) {
 
 }
 
-//GetNewMetric   generate Prometheus metrics
-func (shard *ShardedIncomingDataCache) GetNewMetric(ch chan<- prometheus.Metric) {
-	shard.lock.Lock()
-	defer shard.lock.Unlock()
-	for _, IncomingDataInterface := range shard.plugin {
-		if collectd, ok := IncomingDataInterface.(*incoming.Collectd); ok {
-			if collectd.ISNew() {
-				collectd.SetNew(false)
-				for index := range collectd.Values {
-					m, err := tsdb.NewCollectdMetric(*collectd, index)
-					if err != nil {
-						log.Printf("newMetric: %v", err)
-						continue
-					}
-
-					ch <- m
-				}
-			}
-		}
-	}
-}
 func (cs CacheServer) close() {
 	<-quitCacheServerCh
 	close(quitCacheServerCh)

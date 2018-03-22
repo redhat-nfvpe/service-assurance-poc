@@ -3,7 +3,6 @@ package tsdb
 import (
 	"fmt"
 	"regexp"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 )
@@ -11,6 +10,7 @@ import (
 var (
 	metricNameRe = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
+
 
 //NewCollectdMetric converts one data source of a value list to a Prometheus metric.
 func NewCollectdMetric(collectd incoming.Collectd, index int) (prometheus.Metric, error) {

@@ -40,18 +40,19 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 //need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
-	for _, plugin := range c.cache.GetHosts() {
-		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
-	}
-
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
 	ch <- lastPull
-
-	for _, plugin := range c.cache.GetHosts() {
+	allHosts := c.cache.GetHosts()
+	for key, plugin := range allHosts {
 		//fmt.Fprintln(w, hostname)
-		plugin.GetNewMetric(ch)
+		plugin.FlushPrometheusMetric(ch)
+		//this will clean up all zero plugins
+		if plugin.Size() == 0 {
+			delete(allHosts, key)
+			log.Printf("Cleaned up cache for host %s", key)
+		}
 	}
+
 }
 
 /*************** main routine ***********************/
@@ -112,14 +113,14 @@ func main() {
 
 	}
 
-	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL)==0) {
+	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL) == 0) {
 		log.Println("AMQP1 Metrics URL is required")
 		usage()
 		os.Exit(1)
 	}
 
 	//Cache sever to process and serve the exporter
-	cacheServer := cacheutil.NewCacheServer()
+	cacheServer := cacheutil.NewCacheServer(cacheutil.MAXTTL)
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
 
@@ -184,19 +185,19 @@ func main() {
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		amqpMetricServer = amqplistener.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
 
-	for {
-		 select {
-		 case data := <-amqpMetricServer.GetNotifier():
-			 //fmt.Printf("%v",data)
-			 incomingType := incoming.NewInComing(incoming.COLLECTD)
-			 incomingType.ParseInputJSON(data)
-			 cacheServer.Put(incomingType)
-			 continue
-		 default:
-			 //no activity
-		 }
-	 }
- }
+		for {
+			select {
+			case data := <-amqpMetricServer.GetNotifier():
+				//fmt.Printf("%v",data)
+				incomingType := incoming.NewInComing(incoming.COLLECTD)
+				incomingType.ParseInputJSON(data)
+				cacheServer.Put(incomingType)
+				continue
+			default:
+				//no activity
+			}
+		}
+	}
 	//TO DO: to close cache server on keyboard interrupt
 
 }
