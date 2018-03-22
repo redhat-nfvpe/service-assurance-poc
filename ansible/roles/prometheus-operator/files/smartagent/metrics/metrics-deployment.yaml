@@ -14,10 +14,10 @@ spec:
         runAsUser: 65534
       containers:
       - name: metrics
-        image: docker.io/nfvpe/metrics:latest
-        ports:
-        - name: metrics
-          containerPort: 8081
+        image: docker.io/nfvpe/sa_metrics:latest
+        volumeMounts:
+        - name: metrics-config
+          mountPath: /config
         resources:
           requests:
             memory: 100Mi
@@ -25,3 +25,12 @@ spec:
           limits:
             memory: 200Mi
             cpu: 200m
+        args: ["-config=/config/sa.metrics.config.json"]
+        ports:
+        - name: metrics
+          containerPort: 8081
+      volumes:
+      - name: metrics-config
+        configMap:
+          name: metrics-config
+
