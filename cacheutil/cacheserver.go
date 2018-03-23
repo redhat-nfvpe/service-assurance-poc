@@ -87,7 +87,7 @@ func (i IncomingDataCache) GetHosts() map[string]*ShardedIncomingDataCache {
 	return i.hosts
 }
 
-//GetLastAccess ..Get lastt access time ...
+//GetLastAccess ..Get last access time ...
 func (shard *ShardedIncomingDataCache) GetLastAccess() int64 {
 	return shard.lastAccess
 }
