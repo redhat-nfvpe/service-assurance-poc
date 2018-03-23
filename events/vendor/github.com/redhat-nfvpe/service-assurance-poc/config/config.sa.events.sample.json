@@ -1,4 +1,0 @@
-{
-	"AMQP1EventURL": "127.0.0.1:5672/collectd/notify",
-	"ElasticHostURL": "http://127.0.0.1:9200
-}
