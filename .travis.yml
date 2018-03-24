@@ -32,13 +32,11 @@ script:
   - go build -o event-listener events.go
   - go build -o tools/sa-bench/sa-bench tools/sa-bench/main.go
 
-after_script:
+before_deploy:
+  - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"
   - docker build --tag nfvpe/metrics_consumer:latest -f docker/metrics/Dockerfile .
   - docker build --tag nfvpe/events_consumer:latest -f docker/metrics/Dockerfile .
   - docker images
-
-before_deploy:
-  - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"
 
 deploy:
   provider: script
