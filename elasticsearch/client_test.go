@@ -35,7 +35,7 @@ const elastichost = "http://10.19.110.5:9200"
 func TestMain(m *testing.M) {
 	// call flag.Parse() here if TestMain uses flags
 	var client *ElasticClient
-	client = CreateClient(elastichost, true)
+	client = CreateClient(elastichost, false)
 	if client.err != nil {
 		log.Fatalf("Failed to connect to elastic search%s", client.err)
 	} else {
@@ -81,7 +81,7 @@ func TestSanitizeOvs(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	var client *ElasticClient
-	client = CreateClient(elastichost, true)
+	client = CreateClient(elastichost, false)
 	if client.err != nil {
 		t.Errorf("Failed to connect to elastic search%s", client.err)
 	}
@@ -89,7 +89,7 @@ func TestClient(t *testing.T) {
 
 func TestIndexCreateAndDelete(t *testing.T) {
 	var client *ElasticClient
-	client = CreateClient(elastichost, true)
+	client = CreateClient(elastichost, false)
 	if client.err != nil {
 		t.Errorf("Failed to connect to elastic search%s", client.err)
 	} else {
@@ -117,7 +117,7 @@ func TestIndexCreateAndDelete(t *testing.T) {
 
 func TestConnectivityDataCreate(t *testing.T) {
 	var client *ElasticClient
-	client = CreateClient(elastichost, true)
+	client = CreateClient(elastichost, false)
 	if client.err != nil {
 		t.Errorf("Failed to connect to elastic search%s", client.err)
 	} else {
