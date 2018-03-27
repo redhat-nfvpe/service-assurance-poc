@@ -36,6 +36,7 @@ func main() {
 
 	fAMQP1EventURL := flag.String("amqp1EventURL", "", "AMQP1.0 events listener example 127.0.0.1:5672/collectd/notify")
 	fElasticHostURL := flag.String("eshost", "", "elasticsearch host http://localhost:9200")
+	fRestIndex := flag.Bool("resetIndex", false, "Optional Clean all index before on start (default false)")
 
 	flag.Parse()
 	var serverConfig saconfig.EventConfiguration
@@ -45,6 +46,7 @@ func main() {
 		serverConfig = saconfig.EventConfiguration{
 			AMQP1EventURL:  *fAMQP1EventURL,
 			ElasticHostURL: *fElasticHostURL,
+			RestIndex:      *fRestIndex,
 		}
 
 	}
@@ -66,7 +68,7 @@ func main() {
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
 	amqpEventServer = amqplistener.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
 	var elasticClient *saelastic.ElasticClient
-	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL)
+	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL, serverConfig.RestIndex)
 
 	for {
 		select {

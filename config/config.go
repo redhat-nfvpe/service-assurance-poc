@@ -10,6 +10,7 @@ import (
 type EventConfiguration struct {
 	AMQP1EventURL  string
 	ElasticHostURL string
+	RestIndex      bool
 }
 
 //MetricConfiguration   ....
