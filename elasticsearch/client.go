@@ -53,7 +53,7 @@ func (ec *ElasticClient) InitAllMappings() {
 }
 
 //CreateClient   ....
-func CreateClient(elastichost string) *ElasticClient {
+func CreateClient(elastichost string, resetIndex bool) *ElasticClient {
 	//c, _ = client.New(client.WithHosts([]string{"https://elasticsearch:9200"}))
 	var elasticClient *ElasticClient
 	//var eClient *elastic.Client
@@ -64,7 +64,9 @@ func CreateClient(elastichost string) *ElasticClient {
 		return elasticClient
 	}
 	elasticClient = &ElasticClient{client: eclient, ctx: context.Background()}
-	elasticClient.InitAllMappings()
+	if resetIndex {
+		elasticClient.InitAllMappings()
+	}
 	return elasticClient
 }
 
