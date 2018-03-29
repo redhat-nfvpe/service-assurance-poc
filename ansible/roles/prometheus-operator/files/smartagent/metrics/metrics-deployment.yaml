@@ -14,7 +14,7 @@ spec:
         runAsUser: 65534
       containers:
       - name: metrics
-        image: docker.io/nfvpe/sa_metrics:latest
+        image: docker.io/nfvpe/metrics_consumer:latest
         volumeMounts:
         - name: metrics-config
           mountPath: /config
