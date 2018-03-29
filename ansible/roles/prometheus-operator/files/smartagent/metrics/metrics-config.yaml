@@ -7,12 +7,8 @@ data:
     {
             "Exporterhost": "0.0.0.0",
             "Exporterport": 8081,
-            "Hosts": "10",
-            "Plugins": "100",
-            "UseSample": true,
-            "Sample": {
-                    "HostCount": 10,
-                    "PluginCount": 100,
-                    "DataCount": -1
-            }
+            "AMQP1MetricURL": "192.168.122.1:5672/collectd/telemetry",
+            "CPUStats": false,
+            "DataCount": -1,
+            "UseSample": false
     }
