@@ -1,0 +1,20 @@
+galaxy_info:
+  author: NFVPE
+  description: A role for deploying QDR 
+  company: Red Hat, Inc.
+
+  license: Apache
+
+  min_ansible_version: 2.3
+
+  platforms:
+  - name: EL
+    versions:
+    - 7
+
+  galaxy_tags:
+  - networking
+  - packaging
+  - system
+
+dependencies: []
