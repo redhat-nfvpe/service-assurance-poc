@@ -1,0 +1,43 @@
+---
+- name: Install docker-py
+  package:
+    name: docker-python
+    state: present
+
+- name: Get QDR container image
+  docker_image:
+    name: "{{ item }}"
+  with_items:
+    - nfvpe/qpid-dispatch-router
+
+- name: Create directory for QDR configuration
+  file:
+    state: directory
+    path: "{{ ansible_env.HOME }}/qdr.conf.d"
+
+- name: Deploy configuration for QDR on client
+  template:
+    src: qdrouterd.conf.j2
+    dest: "{{ ansible_env.HOME }}/qdr.conf.d/qdrouterd.conf"
+
+- name: Start QDR container (cloud side)
+  docker_container:
+    name: qdr
+    image: nfvpe/qpid-dispatch-router
+    published_ports: 172.17.0.1:5672:5672
+    volumes: "{{ ansible_env.HOME }}/qdr.conf.d/:/etc/qdr.conf.d/:Z"
+    restart: yes
+    command: "--config=/etc/qdr.conf.d/qdrouterd.conf"
+  tags:
+    - qdr-cloud-side
+
+- name: Start QDR container (telemetry side)
+  docker_container:
+    name: qdr
+    image: nfvpe/qpid-dispatch-router
+    volumes: "{{ ansible_env.HOME }}/qdr.conf.d/:/etc/qdr.conf.d/:Z"
+    restart: yes
+    network_mode: host
+    command: "--config=/etc/qdr.conf.d/qdrouterd.conf"
+  tags:
+    - qdr-telemetry-side

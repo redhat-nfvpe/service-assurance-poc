@@ -1,7 +1,0 @@
----
-- name: Install Prometheus Operator
-  hosts: master
-  tasks:
-    - import_role:
-        name: prometheus-operator
-        tasks_from: install.yml

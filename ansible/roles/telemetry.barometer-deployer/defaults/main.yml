@@ -1,0 +1,17 @@
+---
+barometer:
+  host: 172.17.0.1
+  port: 5672
+
+plugins:
+  - cpufreq
+  - disk
+  - ethstat
+  - ipc
+  - ipmi
+  - load
+  - memory
+  - numa
+  - processes
+  - df
+  - uptime

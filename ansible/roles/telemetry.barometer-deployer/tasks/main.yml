@@ -1,0 +1,31 @@
+---
+- name: Get barometer-collect container image
+  docker_image:
+    name: "{{ item }}"
+  with_items:
+    - nfvpe/barometer-collectd
+
+- name: Create directory for barometer-collectd configuration
+  file:
+    state: directory
+    path: "{{ ansible_env.HOME }}/barometer-collectd.conf.d"
+
+- name: Deploy configuration for barometer-collectd on client
+  template:
+    src: "{{ item }}.conf.j2"
+    dest: "{{ ansible_env.HOME }}/barometer-collectd.conf.d/{{ item }}.conf"
+  with_items:
+    - default
+    - barometer
+
+- name: Start barometer-collectd container
+  docker_container:
+    name: barometer
+    image: nfvpe/barometer-collectd
+    privileged: yes
+    network_mode: host
+    volumes:
+      - "{{ ansible_env.HOME }}/barometer-collectd.conf.d/:/opt/collectd/etc/collectd.conf.d/"
+      - /var/run:/var/run
+      - /tmp:/tmp
+    restart: yes

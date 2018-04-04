@@ -1,0 +1,15 @@
+---
+- name: Install Prometheus Operator
+  hosts: kube-master
+  tasks:
+    - import_role:
+        name: telemetry.prometheus-operator
+        tasks_from: install.yml
+      vars:
+        promops_deploy:
+          name: sa
+          namespace: sa
+          storage:
+            class_name: sa
+            size: 2Gi
+

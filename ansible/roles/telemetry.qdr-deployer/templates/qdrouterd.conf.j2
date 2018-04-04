@@ -1,0 +1,65 @@
+# See the qdrouterd.conf (5) manual page for information about this
+# file's format and options.
+
+router {
+{% if router.mode is defined %}    mode: {{ router.mode }}
+{% endif %}
+    id: {{ router.id_prefix }}.{{ ansible_hostname }}
+}
+
+{% if listeners is defined %}
+# This is for _client_ connections (senders and receivers, collectd wirtes to this )
+# to connect on port 5672:
+{% for listener in listeners %}
+listener {
+    host: {{ listener.host }}
+    port: {{ listener.port }}
+{% if listener.role is defined %}    role: {{ listener.role }}
+{% endif %}
+    authenticatePeer: no
+    saslMechanisms: ANONYMOUS
+}
+
+{% endfor %}
+{% endif %}
+{% if connectors is defined %}
+# This establishes an outgoing inter-router connection to QPD.B
+# listener
+#
+{% for connector in connectors %}
+connector {
+    role: {{ connector.role }}
+    host: {{ connector.host }}
+    port: {{ connector.port }}
+    saslMechanisms: ANONYMOUS
+}
+
+{% endfor %}
+{% endif %}
+# Various address prefix -> distribution pattern
+# configurations:
+#
+address {
+    prefix: closest
+    distribution: closest
+}
+
+address {
+    prefix: multicast
+    distribution: multicast
+}
+
+address {
+    prefix: unicast
+    distribution: closest
+}
+
+address {
+    prefix: exclusive
+    distribution: closest
+}
+
+address {
+    prefix: broadcast
+    distribution: multicast
+}
