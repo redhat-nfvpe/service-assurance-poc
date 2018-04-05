@@ -15,6 +15,7 @@ spec:
     matchLabels:
       role: prometheus-rulefiles
       prometheus: sa
+  scrapeInterval: "4s"
   resources:
     requests:
       # 2Gi is default, but won't schedule if you don't have a node with >2Gi
