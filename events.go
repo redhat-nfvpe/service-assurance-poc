@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os/signal"
+	"time"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
@@ -13,8 +16,8 @@ import (
 )
 
 /*************** main routine ***********************/
-// Usage and command-line flags
-func usage() {
+// eventusage and command-line flags
+func eventusage() {
 	doc := heredoc.Doc(`
   For running with config file use
 	********************* config *********************
@@ -31,7 +34,7 @@ func usage() {
 
 func main() {
 	// set flags for parsing options
-	flag.Usage = usage
+	flag.Usage = eventusage
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
 
 	fAMQP1EventURL := flag.String("amqp1EventURL", "", "AMQP1.0 events listener example 127.0.0.1:5672/collectd/notify")
@@ -53,22 +56,38 @@ func main() {
 
 	if len(serverConfig.AMQP1EventURL) == 0 {
 		log.Println("AMQP1 Event URL is required")
-		usage()
+		eventusage()
 		os.Exit(1)
 	}
 	if len(serverConfig.ElasticHostURL) == 0 {
 		log.Println("Elastic Host URL is required")
-		usage()
+		eventusage()
 		os.Exit(1)
 	}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			// sig is a ^C, handle it
+			log.Printf("caught sig: %+v", sig)
+			log.Println("Wait for 2 second to finish processing")
+			time.Sleep(2 * time.Second)
+			os.Exit(0)
+		}
+	}()
 
+	log.Printf("Config %#v\n", serverConfig)
 	eventsNotifier := make(chan string) // Channel for messages from goroutines to main()
 	var amqpEventServer *amqplistener.AMQPServer
 	///Metric Listener
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
+	log.Printf("Connecting to AMQP1 : %s\n", amqpEventsurl)
 	amqpEventServer = amqplistener.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
+	log.Printf("Listening.....\n")
 	var elasticClient *saelastic.ElasticClient
+	log.Printf("Connecting to ElasticSearch : %s\n", serverConfig.ElasticHostURL)
 	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL, serverConfig.RestIndex)
+	log.Println("Ready....")
 
 	for {
 		select {

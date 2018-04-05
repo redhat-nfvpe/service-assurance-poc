@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os/signal"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
@@ -56,8 +58,8 @@ func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 }
 
 /*************** main routine ***********************/
-// Usage and command-line flags
-func usage() {
+// metricusage and command-line flags
+func metricusage() {
 	doc := heredoc.Doc(`
   For running with config file use
 	********************* config *********************
@@ -79,7 +81,7 @@ func usage() {
 
 func main() {
 	// set flags for parsing options
-	flag.Usage = usage
+	flag.Usage = metricusage
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
 	fIncludeStats := flag.Bool("cpustats", false, "Include cpu usage info in http requests (degrades performance)")
 	fExporterhost := flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
@@ -115,7 +117,7 @@ func main() {
 
 	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL) == 0) {
 		log.Println("AMQP1 Metrics URL is required")
-		usage()
+		metricusage()
 		os.Exit(1)
 	}
 
@@ -150,13 +152,30 @@ func main() {
 	handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			// sig is a ^C, handle it
+			log.Printf("caught sig: %+v", sig)
+			log.Println("Wait for 2 second to finish processing")
+			time.Sleep(2 * time.Second)
+			os.Exit(0)
+		}
+	}()
+	log.Printf("Config %#v\n", serverConfig)
 	//run exporter fro prometheus to scrape
 	go func() {
 		metricsURL := fmt.Sprintf("%s:%d", serverConfig.Exporterhost, serverConfig.Exporterport)
+		log.Printf("Metric server at : %s\n", metricsURL)
 		log.Fatal(http.ListenAndServe(metricsURL, handler))
 	}()
+	time.Sleep(2 * time.Second)
+	log.Println("HTTP server is ready....")
+
 	//if running just samples
 	if serverConfig.UseSample {
+		log.Println("Using sample data")
 		if serverConfig.Sample.DataCount == -1 {
 			serverConfig.Sample.DataCount = 9999999
 		}
@@ -183,7 +202,9 @@ func main() {
 		var amqpMetricServer *amqplistener.AMQPServer
 		///Metric Listener
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
+		log.Printf("Connecting to AMQP1 : %s\n", amqpMetricsurl)
 		amqpMetricServer = amqplistener.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
+		log.Printf("Listening.....\n")
 
 		for {
 			select {
