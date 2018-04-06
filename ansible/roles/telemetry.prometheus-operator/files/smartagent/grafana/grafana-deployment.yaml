@@ -36,3 +36,9 @@ spec:
       - name: grafana-datasources
         configMap:
           name: grafana-datasources
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-dashboards
+      - name: grafana-dashboard-definitions-0
+        configMap:
+          name: grafana-dashboard-definitions-0
