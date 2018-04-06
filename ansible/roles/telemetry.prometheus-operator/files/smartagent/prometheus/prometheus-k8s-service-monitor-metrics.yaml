@@ -13,4 +13,4 @@ spec:
     - sa
   endpoints:
   - port: metrics
-    interval: 30s
+    interval: 4s
