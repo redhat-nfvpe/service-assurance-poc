@@ -20,6 +20,10 @@ spec:
           mountPath: /data
         - name: grafana-datasources
           mountPath: /grafana/conf/provisioning/datasources
+        - name: grafana-dashboards
+          mountPath: /grafana/conf/provisioning/dashboards
+        - name: grafana-dashboard-definitions-0
+          mountPath: /grafana-dashboard-definitions/0
         ports:
         - name: web
           containerPort: 3000
