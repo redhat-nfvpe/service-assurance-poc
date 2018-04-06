@@ -70,7 +70,7 @@ data:
             "rgba(237, 129, 40, 0.89)",
             "#d44a3a"
           ],
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "format": "dtdurations",
           "gauge": {
             "maxValue": null,
@@ -150,7 +150,7 @@ data:
             "rgba(237, 129, 40, 0.89)",
             "#d44a3a"
           ],
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "format": "none",
           "gauge": {
             "maxValue": 4,
@@ -231,7 +231,7 @@ data:
             "rgba(237, 129, 40, 0.89)",
             "#d44a3a"
           ],
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "format": "none",
           "gauge": {
             "maxValue": 4,
@@ -313,7 +313,7 @@ data:
             "rgba(237, 129, 40, 0.89)",
             "#d44a3a"
           ],
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "format": "none",
           "gauge": {
             "maxValue": 4,
@@ -391,7 +391,7 @@ data:
           "bars": true,
           "dashLength": 10,
           "dashes": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "fill": 2,
           "gridPos": {
             "h": 9,
@@ -471,7 +471,7 @@ data:
           "bars": false,
           "dashLength": 10,
           "dashes": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "fill": 1,
           "gridPos": {
             "h": 9,
@@ -558,7 +558,7 @@ data:
           "bars": false,
           "dashLength": 10,
           "dashes": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "fill": 1,
           "gridPos": {
             "h": 9,
@@ -638,7 +638,7 @@ data:
           "bars": false,
           "dashLength": 10,
           "dashes": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "prometheus",
           "decimals": null,
           "fill": 1,
           "gridPos": {
@@ -732,7 +732,7 @@ data:
           {
             "allValue": null,
             "current": {},
-            "datasource": "${DS_PROMETHEUS}",
+            "datasource": "prometheus",
             "hide": 0,
             "includeAll": false,
             "label": "Cloud Nodes",
