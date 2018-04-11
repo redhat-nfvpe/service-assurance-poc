@@ -16,6 +16,7 @@ type EventConfiguration struct {
 //MetricConfiguration   ....
 type MetricConfiguration struct {
 	AMQP1MetricURL string
+	AMQPProxySocket string
 	CPUStats       bool
 	Exporterhost   string
 	Exporterport   int
