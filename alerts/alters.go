@@ -16,6 +16,7 @@ type Alerts struct {
 	GeneratorURL string            `json:"generatorURL"`
 }
 
+//SetName ... set unique name for alerts
 func (a *Alerts) SetName() {
 	values := make([]string, 0, len(a.Labels)-1)
 	for k, v := range a.Labels {
@@ -26,10 +27,11 @@ func (a *Alerts) SetName() {
 	a.Labels["name"] = strings.Join(values, "_")
 }
 
-func (a *Alerts) Parse(eventJson []byte, generatorURL string) {
+//Parse ...parses alerts to validate for schema
+func (a *Alerts) Parse(eventJSON []byte, generatorURL string) {
 	var dat []map[string]interface{}
 	a.GeneratorURL = generatorURL
-	if err := json.Unmarshal(eventJson, &dat); err != nil {
+	if err := json.Unmarshal(eventJSON, &dat); err != nil {
 		log.Println("Error parsing events for alerts.")
 		log.Panic(err)
 	}
@@ -50,8 +52,4 @@ func (a *Alerts) Parse(eventJson []byte, generatorURL string) {
 	}
 	a.SetName()
 	a.Labels["alertsource"] = "SMARTAGENT"
-
-	//a.StartsAt = dat[0]["startsAt"].(string)
-	log.Printf("%#v", a)
-
 }

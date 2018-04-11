@@ -171,8 +171,11 @@ following command to get the vendored dependencies.
 
 ### With configuration file
 
-
     $ go run metrics.go --config sa.metrics.config.json
+    
+### With debug
+
+    $ go run metrics.go --config sa.metrics.config.json --debug
 
 ## For running metrics with Sample data,  without AMQP use the following option.
 
@@ -201,6 +204,8 @@ following command to get the vendored dependencies.
             No of times to run sample data (default 1) -1 for ever. (default 1)
       -usesample
             Use sample data instead of amqp.This will not fetch any data from amqp (OPTIONAL)
+      -debug
+            Enable debug
 
 # Container Image Builds
 

@@ -5,6 +5,7 @@
 	"CPUStats": false,
 	"DataCount": -1,
 	"UseSample": false,
+	"Debug": false,
 	"Sample": {
 		"HostCount": 10,
 		"PluginCount": 100,

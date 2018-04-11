@@ -13,6 +13,7 @@ import (
 var MAXTTL int64 = 300
 var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
+var debugc = func(format string, data ...interface{}) {} // Default no debugging output
 
 //IncomingBuffer  this is inut data send to cache server
 //IncomingBuffer  ..its of type collectd or anything else
@@ -165,10 +166,13 @@ func (cs *CacheServer) GetCache() *IncomingDataCache {
 }
 
 //NewCacheServer   ...
-func NewCacheServer(maxTTL int64) *CacheServer {
+func NewCacheServer(maxTTL int64, debug bool) *CacheServer {
 	server := &CacheServer{
 		cache: NewCache(maxTTL),
 		ch:    make(chan *IncomingBuffer),
+	}
+	if debug {
+		debugc = func(format string, data ...interface{}) { log.Printf(format, data...) }
 	}
 	// Spawn off the server's main loop immediately
 	go server.loop()
@@ -226,8 +230,11 @@ func (cs *CacheServer) GenrateSampleData(key string, itemCount int, datatype inc
 	//100 plugins
 	for j := 0; j < itemCount; j++ {
 		pluginname := fmt.Sprintf("%s_%d", "plugin_name_", j)
+		debugc("Debug:Pluginname %s\n", pluginname)
 		//. defer wg.Done()
 		newSample := datatype.GenerateSampleData(key, pluginname)
+		debugc("Debug:Sample %#v\n", newSample)
+
 		cs.Put(newSample)
 
 	}

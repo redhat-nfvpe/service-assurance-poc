@@ -10,6 +10,8 @@ import (
 	"log"
 )
 
+var debuges = func(format string, data ...interface{}) {} // Default no debugging output
+
 //IndexName   ..
 type IndexName string
 
@@ -53,8 +55,11 @@ func (ec *ElasticClient) InitAllMappings() {
 }
 
 //CreateClient   ....
-func CreateClient(elastichost string, resetIndex bool) *ElasticClient {
+func CreateClient(elastichost string, resetIndex bool, debug bool) *ElasticClient {
 	//c, _ = client.New(client.WithHosts([]string{"https://elasticsearch:9200"}))
+	if debug {
+		debuges = func(format string, data ...interface{}) { log.Printf(format, data...) }
+	}
 	var elasticClient *ElasticClient
 	//var eClient *elastic.Client
 	eclient, err := elastic.NewClient(elastic.SetURL(elastichost))
@@ -67,6 +72,7 @@ func CreateClient(elastichost string, resetIndex bool) *ElasticClient {
 	if resetIndex {
 		elasticClient.InitAllMappings()
 	}
+	debuges("Debug:ElasticSearch client created.")
 	return elasticClient
 }
 
@@ -96,7 +102,7 @@ func (ec *ElasticClient) CreateIndex(index string, mapping string) {
 //genUUIDv4   ...
 func genUUIDv4() string {
 	id, _ := uuid.NewV4()
-	log.Printf("github.com/satori/go.uuid:   %s\n", id)
+	debuges("Debug:github.com/satori/go.uuid:   %s\n", id)
 	return id.String()
 }
 
@@ -105,7 +111,7 @@ func (ec *ElasticClient) Create(indexname string, indextype IndexType, jsondata 
 	ctx := ec.ctx
 	id := genUUIDv4()
 	body := Sanitize(jsondata)
-	log.Printf("Printing body %s\n", body)
+	debuges("Debug:Printing body %s\n", body)
 	result, err := ec.client.Index().
 		Index(string(indexname)).
 		Type(string(indextype)).
@@ -116,7 +122,7 @@ func (ec *ElasticClient) Create(indexname string, indextype IndexType, jsondata 
 		// Handle error
 		return id, err
 	}
-	log.Printf("Indexed  %s to index %s, type %s\n", result.Id, result.Index, result.Type)
+	debuges("Debug:Indexed  %s to index %s, type %s\n", result.Id, result.Index, result.Type)
 	// Flush to make sure the documents got written.
 	// Flush asks Elasticsearch to free memory from the index and
 	// flush data to disk.
@@ -174,7 +180,7 @@ func (ec *ElasticClient) Get(indexname string, indextype IndexType, id string) (
 		return result.Fields,nil
 	}*/
 	if result.Found {
-		log.Printf("Got document %s in version %d from index %s, type %s\n", result.Id, result.Version, result.Index, result.Type)
+		debuges("Debug:Got document %s in version %d from index %s, type %s\n", result.Id, result.Version, result.Index, result.Type)
 	}
 	return result, nil
 }
@@ -195,7 +201,7 @@ func (ec *ElasticClient) Search(indexname string) *elastic.SearchResult {
 		// Handle error
 		panic(err)
 	}
-	log.Printf("Query took %d milliseconds\n", searchResult.TookInMillis)
+	debuges("Debug:Query took %d milliseconds\n", searchResult.TookInMillis)
 	return searchResult
 
 }

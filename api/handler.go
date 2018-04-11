@@ -2,6 +2,7 @@ package apihandler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 )
+
+var debugh = func(format string, data ...interface{}) {} // Default no debugging output
 
 type (
 
@@ -29,38 +32,46 @@ type (
 		Alerts            []Alert           `json:"alerts"`
 	}
 
-	// Alert is a single alert.
+	//Alert is a single alert.
 	Alert struct {
 		Labels      map[string]string `json:"labels"`
 		Annotations map[string]string `json:"annotations"`
 		StartsAt    string            `json:"startsAt,omitempty"`
 		EndsAt      string            `json:"EndsAt,omitempty"`
 	}
-	ApiContext struct {
+	//APIContext ...
+	APIContext struct {
 		Config      *saconfig.EventConfiguration
 		AMQP1Sender *amqp10.AMQPSender
-
-		// ... and the rest of our globals.
 	}
+	//Handler ...
 	Handler struct {
-		*ApiContext
-		H func(c *ApiContext, w http.ResponseWriter, r *http.Request) (int, error)
-	}
-	body_struct struct {
-		body string
+		*APIContext
+		H func(c *APIContext, w http.ResponseWriter, r *http.Request) (int, error)
 	}
 )
+
+//NewAPIContext ...
+func NewAPIContext(serverConfig saconfig.EventConfiguration) *APIContext {
+	amqpPublishurl := fmt.Sprintf("amqp://%s", serverConfig.API.AMQP1PublishURL)
+	amqpSender := amqp10.NewAMQPSender(amqpPublishurl, false)
+	context := &APIContext{Config: &serverConfig, AMQP1Sender: amqpSender}
+	if serverConfig.Debug {
+		debugh = func(format string, data ...interface{}) { log.Printf(format, data...) }
+	}
+	return context
+}
 
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "ok\n")
 }
 
+//ServeHTTP...
 func (ah Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Updated to pass ah.appContext as a parameter to our handler type.
-	log.Printf("API is invoked")
-	status, err := ah.H(ah.ApiContext, w, r)
+	status, err := ah.H(ah.APIContext, w, r)
 	if err != nil {
-		log.Printf("HTTP %d: %q", status, err)
+		debugh("Debug:HTTP %d: %q", status, err)
 		switch status {
 		case http.StatusNotFound:
 			http.NotFound(w, r)
@@ -74,23 +85,23 @@ func (ah Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AlertHandler(a *ApiContext, w http.ResponseWriter, r *http.Request) (int, error) {
-	log.Printf("AlertHandler is invoked")
-	log.Printf("BODY %#v", r.Body)
+//AlertHandler  ...
+func AlertHandler(a *APIContext, w http.ResponseWriter, r *http.Request) (int, error) {
 	var body HookMessage
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 	if err := decoder.Decode(&body); err != nil {
-		log.Printf("error decoding message: %v", err)
 		http.Error(w, "invalid request body", 400)
 		return http.StatusInternalServerError, err
 	}
 
-	log.Printf("body.body %#v\n", body)
+	debugh("API AlertHandler Body%#v\n", body)
 	out, err := json.Marshal(body)
 	if err != nil {
 		panic(err)
 	}
+	debugh("Debug:Sending alerts to to AMQP")
+	debugh("Debug:Alert on AMQP%#v\n", string(out))
 	a.AMQP1Sender.Send(string(out))
 
 	// We can shortcut this: since renderTemplate returns `error`,

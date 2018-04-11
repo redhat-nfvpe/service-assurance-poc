@@ -40,7 +40,7 @@ URLs are of the form "amqp://<host>:<port>/<amqp-address>"
 	flag.PrintDefaults()
 }*/
 
-var debugf = func(format string, data ...interface{}) {} // Default no debugging output
+var debugr = func(format string, data ...interface{}) {} // Default no debugging output
 
 //AMQPServer msgcount -1 is infinite
 type AMQPServer struct {
@@ -73,6 +73,9 @@ func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string
 		msgcount:    msgcount,
 		connections: make(chan electron.Connection, 1),
 	}
+	if debug {
+		debugr = func(format string, data ...interface{}) { log.Printf(format, data...) }
+	}
 	// Spawn off the server's main loop immediately
 	// not exported
 	go server.start()
@@ -87,7 +90,7 @@ func (s *AMQPServer) GetNotifier() chan string {
 //Close connections it is exported so users can force close
 func (s *AMQPServer) Close() {
 	c := <-s.connections
-	debugf("close %s", c)
+	debugr("Debug:close %s", c)
 	c.Close(nil)
 }
 
@@ -145,11 +148,9 @@ func (s *AMQPServer) start() {
 	//var firstmsg=0
 	for {
 		m := <-messages
-		//fmt.Println(reflect.TypeOf( m.Body()))
-		//fmt.Printf("%v\n", m.Body())
+		debugr("Debug: Getting message from AMQP%v\n", m.Body())
 		amqpBinary := m.Body().(amqp.Binary)
-		//fmt.Printf("The Go String%s\n", amqpBinary.String())
-
+		debugr("Debug: Sending message to Notifier channel")
 		s.notifier <- amqpBinary.String()
 	}
 

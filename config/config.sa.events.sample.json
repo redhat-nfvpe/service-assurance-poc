@@ -3,6 +3,7 @@
 	"ElasticHostURL": "http://127.0.0.1:9200",
 	"AlertManagerURL": "http://127.0.0.1:9093/api/v1/alerts",
 	"RestIndex": false,
+	"Debug": true,
 	"API":  {
 	 "APIEndpointURL":  "http://127.0.0.1:8082",
 	 "AMQP1PublishURL": "127.0.0.1:5672/collectd/alert"

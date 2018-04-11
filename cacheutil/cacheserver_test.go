@@ -27,7 +27,7 @@ func TestCacheServer2(t *testing.T) {
 	//	var freeListToCollectSample = make(chan *IncomingBuffer, 100)
 
 	//  collectd:=incoming.NewInComing(incoming.COLLECTD)
-	server := NewCacheServer(0)
+	server := NewCacheServer(0, true)
 	collectd := incoming.NewInComing(incoming.COLLECTD)
 	server.GenrateSampleData(hostname, pluginCount, collectd)
 
@@ -43,7 +43,6 @@ func TestCacheServer2(t *testing.T) {
 
 }
 
-
 func TestCacheServerForCleanUP(t *testing.T) {
 	pluginCount := 10
 	hostname := "hostname"
@@ -51,7 +50,7 @@ func TestCacheServerForCleanUP(t *testing.T) {
 	//	var freeListToCollectSample = make(chan *IncomingBuffer, 100)
 
 	//  collectd:=incoming.NewInComing(incoming.COLLECTD)
-	server := NewCacheServer(4)
+	server := NewCacheServer(4, true)
 	collectd := incoming.NewInComing(incoming.COLLECTD)
 	server.GenrateSampleData(hostname, pluginCount, collectd)
 	incomingDataCache := server.GetCache()
@@ -68,6 +67,5 @@ func TestCacheServerForCleanUP(t *testing.T) {
 	if size := incomingDataCache.Size(); size != 0 {
 		t.Errorf("wrong count of host , expected 0 and got %d", size)
 	}
-
 
 }
