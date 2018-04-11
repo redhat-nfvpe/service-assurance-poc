@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -88,6 +89,7 @@ func main() {
 	fExporterport := flag.Int("mport", 8081, "Metrics port for Prometheus to export (http://localhost:<port>/metrics) ")
 	fAMQP1MetricURL := flag.String("amqp1MetricURL", "", "AMQP1.0 metrics listener example 127.0.0.1:5672/collectd/telemetry")
 	fCount := flag.Int("count", -1, "Stop after receiving this many messages in total(-1 forever) (OPTIONAL)")
+	fAMQPProxySocket := flag.String("socket", "", "Unix domain socket for amqp-proxy (OPTIONAL)")
 
 	fSampledata := flag.Bool("usesample", false, "Use sample data instead of amqp.This will not fetch any data from amqp (OPTIONAL)")
 	fHosts := flag.Int("h", 1, "No of hosts : Sample hosts required (default 1).")
@@ -100,12 +102,13 @@ func main() {
 		serverConfig = saconfig.LoadMetricConfig(*fConfigLocation)
 	} else {
 		serverConfig = saconfig.MetricConfiguration{
-			AMQP1MetricURL: *fAMQP1MetricURL,
-			CPUStats:       *fIncludeStats,
-			Exporterhost:   *fExporterhost,
-			Exporterport:   *fExporterport,
-			DataCount:      *fCount, //-1 for ever which is default
-			UseSample:      *fSampledata,
+			AMQP1MetricURL:  *fAMQP1MetricURL,
+			AMQPProxySocket: *fAMQPProxySocket,
+			CPUStats:        *fIncludeStats,
+			Exporterhost:    *fExporterhost,
+			Exporterport:    *fExporterport,
+			DataCount:       *fCount, //-1 for ever which is default
+			UseSample:       *fSampledata,
 			Sample: saconfig.SampleDataConfig{
 				HostCount:   *fHosts,   //no of host to simulate
 				PluginCount: *fPlugins, //No of plugin count per hosts
@@ -196,6 +199,35 @@ func main() {
 			time.Sleep(time.Second * 1)
 		}
 
+	} else if serverConfig.AMQPProxySocket != "" {
+		socket, err := net.Listen("unix", serverConfig.AMQPProxySocket)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Socket create failed: %v", err)
+			os.Exit(0)
+		}
+
+		for {
+			fd, err := socket.Accept()
+			defer fd.Close()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Accept error: %v", err)
+				os.Exit(0)
+			}
+
+			go func(c net.Conn) {
+				for {
+					buf := make([]byte, 1024*16)
+					nr, err := c.Read(buf)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "read failed: %v", err)
+						continue
+					}
+					incomingType := incoming.NewInComing(incoming.COLLECTD)
+					incomingType.ParseInputJSON(string(buf[0:nr]))
+					cacheServer.Put(incomingType)
+				}
+			}(fd)
+		}
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
 		metricsNotifier := make(chan string) // Channel for messages from goroutines to main()

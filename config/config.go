@@ -15,14 +15,15 @@ type EventConfiguration struct {
 
 //MetricConfiguration   ....
 type MetricConfiguration struct {
-	AMQP1MetricURL string
-	CPUStats       bool
-	Exporterhost   string
-	Exporterport   int
-	DataCount      int //-1 for ever which is default
-	UseSample      bool
-	Sample         SampleDataConfig
-	IgnoreString   string `json:"-"`
+	AMQP1MetricURL  string
+	AMQPProxySocket string
+	CPUStats        bool
+	Exporterhost    string
+	Exporterport    int
+	DataCount       int //-1 for ever which is default
+	UseSample       bool
+	Sample          SampleDataConfig
+	IgnoreString    string `json:"-"`
 }
 
 //SampleDataConfig  ...
