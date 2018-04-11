@@ -8,9 +8,19 @@ import (
 
 //EventConfiguration  ...
 type EventConfiguration struct {
-	AMQP1EventURL  string
-	ElasticHostURL string
-	RestIndex      bool
+	AMQP1EventURL       string
+	ElasticHostURL      string
+	API                 EventAPIConfig
+	AlertManagerURL     string
+	AlertManagerEnabled bool
+	APIEnabled          bool
+	PublishEventEnabled bool
+	RestIndex           bool
+	IgnoreString        string `json:"-"`
+}
+type EventAPIConfig struct {
+	APIEndpointURL  string //API endpoint
+	AMQP1PublishURL string // new amqp address to send notifications
 }
 
 //MetricConfiguration   ....

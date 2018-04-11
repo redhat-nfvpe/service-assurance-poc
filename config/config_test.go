@@ -19,4 +19,7 @@ func TestEventConfig(t *testing.T) {
 	if len(configuration.AMQP1EventURL) == 0 {
 		t.Error("Empty configuration generated")
 	}
+	if len(configuration.AlertManagerURL) == 0 {
+		t.Error("Empty configuration generated")
+	}
 }

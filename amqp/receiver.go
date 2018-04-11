@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 
-package amqplistener
+package amqp10
 
 import (
 	//	"flag"

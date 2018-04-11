@@ -1,11 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"os/signal"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/redhat-nfvpe/service-assurance-poc/alerts"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
+	"github.com/redhat-nfvpe/service-assurance-poc/api"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 	"github.com/redhat-nfvpe/service-assurance-poc/elasticsearch"
 
@@ -38,7 +44,10 @@ func main() {
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
 
 	fAMQP1EventURL := flag.String("amqp1EventURL", "", "AMQP1.0 events listener example 127.0.0.1:5672/collectd/notify")
-	fElasticHostURL := flag.String("eshost", "", "elasticsearch host http://localhost:9200")
+	fElasticHostURL := flag.String("eshost", "", "ElasticSearch host http://localhost:9200")
+	fAlertManagerURL := flag.String("alertmanager", "", "(Optional)AlertManager endpoint http://localhost:9090/v1/api/alert")
+	fAPIEndpointURL := flag.String("apiurl", "", "(Optional)API endpoint http://localhost:8082")
+	fAMQP1PublishURL := flag.String("publishurl", "", "(Optional) AMQP1.0 event publish address 127.0.0.1:5672/collectd/notify")
 	fRestIndex := flag.Bool("resetIndex", false, "Optional Clean all index before on start (default false)")
 
 	flag.Parse()
@@ -47,9 +56,14 @@ func main() {
 		serverConfig = saconfig.LoadEventConfig(*fConfigLocation)
 	} else {
 		serverConfig = saconfig.EventConfiguration{
-			AMQP1EventURL:  *fAMQP1EventURL,
-			ElasticHostURL: *fElasticHostURL,
-			RestIndex:      *fRestIndex,
+			AMQP1EventURL:   *fAMQP1EventURL,
+			ElasticHostURL:  *fElasticHostURL,
+			AlertManagerURL: *fAlertManagerURL,
+			API: saconfig.EventAPIConfig{
+				APIEndpointURL:  *fAPIEndpointURL,
+				AMQP1PublishURL: *fAMQP1PublishURL,
+			},
+			RestIndex: *fRestIndex,
 		}
 
 	}
@@ -76,18 +90,71 @@ func main() {
 		}
 	}()
 
+	if len(serverConfig.AlertManagerURL) > 0 {
+		log.Printf("AlertManager configured at %s\n", serverConfig.AlertManagerURL)
+		serverConfig.AlertManagerEnabled = true
+	} else {
+		log.Println("AlertManager disabled")
+	}
+	if len(serverConfig.API.APIEndpointURL) > 0 {
+		log.Printf("API availble at %s\n", serverConfig.API.APIEndpointURL)
+		serverConfig.APIEnabled = true
+	} else {
+		log.Println("API disabled")
+	}
+	if len(serverConfig.API.AMQP1PublishURL) > 0 {
+		log.Printf("AMQP1.0 Publish address at %s\n", serverConfig.API.AMQP1PublishURL)
+		serverConfig.PublishEventEnabled = true
+	} else {
+		log.Println("AMQP1.0 Publish address disabled")
+	}
+
+	/* PRINT COnfiguration deatisl */
 	log.Printf("Config %#v\n", serverConfig)
 	eventsNotifier := make(chan string) // Channel for messages from goroutines to main()
-	var amqpEventServer *amqplistener.AMQPServer
+
+	var amqpEventServer *amqp10.AMQPServer
 	///Metric Listener
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
 	log.Printf("Connecting to AMQP1 : %s\n", amqpEventsurl)
-	amqpEventServer = amqplistener.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
+	amqpEventServer = amqp10.NewAMQPServer(amqpEventsurl, true, -1, eventsNotifier)
+
 	log.Printf("Listening.....\n")
 	var elasticClient *saelastic.ElasticClient
 	log.Printf("Connecting to ElasticSearch : %s\n", serverConfig.ElasticHostURL)
 	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL, serverConfig.RestIndex)
 	log.Println("Ready....")
+
+	/**** HTTP Listener for alerts from alert manager *******************************
+	*
+	*
+	********************************************************************************/
+	//configure http alert route to amqp1.0
+	if serverConfig.APIEnabled {
+		amqpPublishurl := fmt.Sprintf("amqp://%s", serverConfig.API.AMQP1PublishURL)
+		amqpSender := amqp10.NewAMQPSender(amqpPublishurl, false)
+		context := &apihandler.ApiContext{Config: &serverConfig, AMQP1Sender: amqpSender}
+
+		http.Handle("/alert", apihandler.Handler{context, apihandler.AlertHandler}) //creates writer everytime api is called.
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`<html>
+																	<head><title>Smart Gateway Event API</title></head>
+																	<body>
+																	<h1>APi </h1>
+																	/alerts Post alerts in Json Format on to amqp bus
+																	</body>
+																	</html>`))
+		})
+
+		go func() {
+			APIEndpointURL := fmt.Sprintf("%s", serverConfig.API.APIEndpointURL)
+			log.Printf("APIEndpoint server at : %s\n", APIEndpointURL)
+			log.Fatal(http.ListenAndServe(APIEndpointURL, nil))
+		}()
+		time.Sleep(2 * time.Second)
+		log.Println("HTTP server for alert is  ready....")
+
+	}
 
 	for {
 		select {
@@ -102,15 +169,47 @@ func main() {
 					log.Printf("Error creating event %s in elastic search %s\n", event, err)
 				} else {
 					log.Printf("Document created in elasticsearch for mapping: %s ,type: %s, id :%s\n", string(indexName), string(indexType), id)
-				}
+					//update AlertManager
+					if serverConfig.AlertManagerEnabled {
+						go func() {
+							var alert = &alerts.Alerts{}
+							var jsonStr = []byte(event)
+							generatorURL := fmt.Sprintf("%s/%s/%s/%s", serverConfig.ElasticHostURL, indexName, indexType, id)
+							alert.Parse(jsonStr, generatorURL)
+							log.Printf("generator URL %S\n", generatorURL)
+							jsonString, err := json.Marshal(*alert)
+							if err != nil {
+								panic(err)
+							}
+							log.Println("Here it comes")
+							var jsonEvent = []byte("[" + string(jsonString) + "]")
+							//var jsonEvent = string(jsonString)
+							//b := new(bytes.Buffer)
+							//json.NewEncoder(b).Encode(jsonEvent)
+							log.Println(jsonEvent)
+							req, err := http.NewRequest("POST", serverConfig.AlertManagerURL, bytes.NewBuffer(jsonEvent))
+							req.Header.Set("X-Custom-Header", "myvalue")
+							req.Header.Set("Content-Type", "application/json")
 
+							client := &http.Client{}
+							resp, err := client.Do(req)
+							if err != nil {
+								panic(err)
+							}
+							defer resp.Body.Close()
+							fmt.Println("response Status:", resp.Status)
+							fmt.Println("response Headers:", resp.Header)
+							body, _ := ioutil.ReadAll(resp.Body)
+							fmt.Println("response Body:", string(body))
+						}()
+					}
+				}
 			}
+
 			continue
 		default:
 			//no activity
 		}
 	}
-
-	//TO DO: to close cache server on keyboard interrupt
 
 }

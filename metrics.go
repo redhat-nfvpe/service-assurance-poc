@@ -199,11 +199,11 @@ func main() {
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
 		metricsNotifier := make(chan string) // Channel for messages from goroutines to main()
-		var amqpMetricServer *amqplistener.AMQPServer
+		var amqpMetricServer *amqp10.AMQPServer
 		///Metric Listener
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		log.Printf("Connecting to AMQP1 : %s\n", amqpMetricsurl)
-		amqpMetricServer = amqplistener.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
+		amqpMetricServer = amqp10.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
 		log.Printf("Listening.....\n")
 
 		for {
