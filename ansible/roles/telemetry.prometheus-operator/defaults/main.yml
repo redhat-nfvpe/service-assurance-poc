@@ -1,4 +1,0 @@
----
-promops_deploy:
-  name: sa
-  namespace: sa
