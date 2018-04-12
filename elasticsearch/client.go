@@ -2,12 +2,13 @@ package saelastic
 
 //import "github.com/elastic/go-elasticsearch/client"
 //import "github.com/redhat-nfvpe/service-assurance-poc/elasticsearch/mapping"
-import "github.com/olivere/elastic"
-import "github.com/satori/go.uuid"
-
 import (
 	"context"
 	"log"
+	"time"
+
+	"github.com/olivere/elastic"
+	"github.com/satori/go.uuid"
 )
 
 var debuges = func(format string, data ...interface{}) {} // Default no debugging output
@@ -62,7 +63,7 @@ func CreateClient(elastichost string, resetIndex bool, debug bool) *ElasticClien
 	}
 	var elasticClient *ElasticClient
 	//var eClient *elastic.Client
-	eclient, err := elastic.NewClient(elastic.SetURL(elastichost))
+	eclient, err := elastic.NewClient(elastic.SetHealthcheckInterval(5*time.Second), elastic.SetURL(elastichost))
 	if err != nil {
 		log.Fatal(err)
 		elasticClient.err = err
@@ -120,6 +121,7 @@ func (ec *ElasticClient) Create(indexname string, indextype IndexType, jsondata 
 		Do(ctx)
 	if err != nil {
 		// Handle error
+		debuges("Create document Error %#v", err)
 		return id, err
 	}
 	debuges("Debug:Indexed  %s to index %s, type %s\n", result.Id, result.Index, result.Type)
