@@ -20,6 +20,7 @@ import (
 	"time"
 )
 
+var debugm = func(format string, data ...interface{}) {} // Default no debugging output
 var (
 	lastPull = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -45,13 +46,17 @@ func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
 	ch <- lastPull
 	allHosts := c.cache.GetHosts()
+	debugm("Debug:Prometheus is requesting to scrape metrics...")
 	for key, plugin := range allHosts {
 		//fmt.Fprintln(w, hostname)
+		debugm("Debug:Getting metrics for host %s  with total plugin size %d\n", key, plugin.Size())
 		plugin.FlushPrometheusMetric(ch)
 		//this will clean up all zero plugins
 		if plugin.Size() == 0 {
+			debugm("Debug:Cleaning all empty plugins.")
+			debugm("Debug:Deleting host key %s\n", key)
 			delete(allHosts, key)
-			log.Printf("Cleaned up cache for host %s", key)
+			debugm("Debug:Cleaned up cache for host %s", key)
 		}
 	}
 
@@ -63,7 +68,7 @@ func metricusage() {
 	doc := heredoc.Doc(`
   For running with config file use
 	********************* config *********************
-	$go run metrics/main.go -config sa.metrics.config.json
+	$go run metrics/main.go -config sa.metrics.config.json -debug
 	**************************************************
 	For running with AMQP and Prometheus use following option
 	********************* Production *********************
@@ -72,7 +77,7 @@ func metricusage() {
 
 	For running Sample data wihout AMQP use following option
 	********************* Sample Data *********************
-	$go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1
+	$go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 -debug
 	*************************************************************`)
 	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
 	fmt.Fprintln(os.Stdout, doc)
@@ -82,6 +87,7 @@ func metricusage() {
 func main() {
 	// set flags for parsing options
 	flag.Usage = metricusage
+	fDebug := flag.Bool("debug", false, "Enable debug")
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
 	fIncludeStats := flag.Bool("cpustats", false, "Include cpu usage info in http requests (degrades performance)")
 	fExporterhost := flag.String("mhost", "localhost", "Metrics url for Prometheus to export. ")
@@ -98,6 +104,9 @@ func main() {
 	var serverConfig saconfig.MetricConfiguration
 	if len(*fConfigLocation) > 0 { //load configuration
 		serverConfig = saconfig.LoadMetricConfig(*fConfigLocation)
+		if *fDebug {
+			serverConfig.Debug = true
+		}
 	} else {
 		serverConfig = saconfig.MetricConfiguration{
 			AMQP1MetricURL: *fAMQP1MetricURL,
@@ -106,6 +115,7 @@ func main() {
 			Exporterport:   *fExporterport,
 			DataCount:      *fCount, //-1 for ever which is default
 			UseSample:      *fSampledata,
+			Debug:          *fDebug,
 			Sample: saconfig.SampleDataConfig{
 				HostCount:   *fHosts,   //no of host to simulate
 				PluginCount: *fPlugins, //No of plugin count per hosts
@@ -113,6 +123,9 @@ func main() {
 			},
 		}
 
+	}
+	if serverConfig.Debug {
+		debugm = func(format string, data ...interface{}) { log.Printf(format, data...) }
 	}
 
 	if serverConfig.UseSample == false && (len(serverConfig.AMQP1MetricURL) == 0) {
@@ -122,7 +135,7 @@ func main() {
 	}
 
 	//Cache sever to process and serve the exporter
-	cacheServer := cacheutil.NewCacheServer(cacheutil.MAXTTL)
+	cacheServer := cacheutil.NewCacheServer(cacheutil.MAXTTL, serverConfig.Debug)
 
 	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
 
@@ -163,7 +176,7 @@ func main() {
 			os.Exit(0)
 		}
 	}()
-	log.Printf("Config %#v\n", serverConfig)
+	debugm("Debug: Config %#v\n", serverConfig)
 	//run exporter fro prometheus to scrape
 	go func() {
 		metricsURL := fmt.Sprintf("%s:%d", serverConfig.Exporterhost, serverConfig.Exporterport)
@@ -188,6 +201,7 @@ func main() {
 					defer hostwaitgroup.Done()
 					hostname := fmt.Sprintf("%s_%d", "redhat.boston.nfv", host_id)
 					incomingType := incoming.NewInComing(incoming.COLLECTD)
+					debugm("Hostname %s IncomingType %#v", hostname, incomingType)
 					go cacheServer.GenrateSampleData(hostname, serverConfig.Sample.PluginCount, incomingType)
 				}(hosts)
 
@@ -199,17 +213,17 @@ func main() {
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
 		metricsNotifier := make(chan string) // Channel for messages from goroutines to main()
-		var amqpMetricServer *amqplistener.AMQPServer
+		var amqpMetricServer *amqp10.AMQPServer
 		///Metric Listener
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		log.Printf("Connecting to AMQP1 : %s\n", amqpMetricsurl)
-		amqpMetricServer = amqplistener.NewAMQPServer(amqpMetricsurl, true, serverConfig.DataCount, metricsNotifier)
+		amqpMetricServer = amqp10.NewAMQPServer(amqpMetricsurl, serverConfig.Debug, serverConfig.DataCount, metricsNotifier)
 		log.Printf("Listening.....\n")
 
 		for {
 			select {
 			case data := <-amqpMetricServer.GetNotifier():
-				//fmt.Printf("%v",data)
+				debugm("Debug: Getting incoming data from notifier channel : %#v\n", data)
 				incomingType := incoming.NewInComing(incoming.COLLECTD)
 				incomingType.ParseInputJSON(data)
 				cacheServer.Put(incomingType)

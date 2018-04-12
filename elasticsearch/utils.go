@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
-	"time"
 )
 
 //EventNotification ....
@@ -29,7 +28,7 @@ func Sanitize(jsondata string) string {
 
 //GetIndexNameType ...
 func GetIndexNameType(jsondata string) (string, IndexType, error) {
-	start := time.Now()
+	//start := time.Now()
 
 	var f []interface{}
 	err := json.Unmarshal([]byte(jsondata), &f)
@@ -37,9 +36,9 @@ func GetIndexNameType(jsondata string) (string, IndexType, error) {
 		log.Fatal(err)
 		return string(GENERICINDEX), GENERICINDEXTYPE, err
 	}
-	elapsed := time.Since(start)
+	//elapsed := time.Since(start)
 	index, indextype, error := typeSwitchAlertname(f[0])
-	log.Printf("getIndexNameType took %s", elapsed)
+	//	log.Printf("getIndexNameType took %s", elapsed)
 	return index, indextype, error
 
 }

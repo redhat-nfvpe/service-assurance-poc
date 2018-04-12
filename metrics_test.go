@@ -21,7 +21,7 @@ func BenchmarkWithSampleData(b *testing.B) {
 	*/
 	fmt.Printf("\nTest data  will run for %d times\n ", b.N)
 	var cacheServer *cacheutil.CacheServer
-	cacheServer = cacheutil.NewCacheServer(0)
+	cacheServer = cacheutil.NewCacheServer(0, false)
 	incomingType := incoming.NewInComing(incoming.COLLECTD)
 	for hostid := 0; hostid < b.N; hostid++ {
 		var hostname = fmt.Sprintf("%s_%d", "redhat.boston.nfv", hostid)
@@ -31,7 +31,7 @@ func BenchmarkWithSampleData(b *testing.B) {
 }
 
 func TestPut(t *testing.T) {
-	var cacheserver = cacheutil.NewCacheServer(0)
+	var cacheserver = cacheutil.NewCacheServer(0, false)
 	var noofiteration, noofhosts, noofpluginperhosts int = 4, 2, 100
 
 	var hostwaitgroup sync.WaitGroup
