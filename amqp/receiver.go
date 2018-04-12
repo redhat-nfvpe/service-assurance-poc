@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
@@ -89,9 +90,14 @@ func (s *AMQPServer) GetNotifier() chan string {
 
 //Close connections it is exported so users can force close
 func (s *AMQPServer) Close() {
-	c := <-s.connections
-	debugr("Debug:close %s", c)
-	c.Close(nil)
+	select {
+	case c := <-s.connections:
+		log.Printf("%s\n", c)
+		debugr("Debug:close %s", c)
+		c.Close(nil)
+	default:
+		return
+	}
 }
 
 //start  starts amqp server
@@ -101,33 +107,41 @@ func (s *AMQPServer) start() {
 	//var wait sync.WaitGroup // Used by main() to wait for all goroutines to end.
 	//wait.Add(1)
 	go func() {
-
-		// Wait for one goroutine per URL
-		container := electron.NewContainer(fmt.Sprintf("receive[%v]", os.Getpid()))
-		//connections := make(chan electron.Connection, 1) // Connections to close on exit
-		url, err := amqp.ParseURL(s.urlStr)
-		fatalIf(err)
-		c, err := container.Dial("tcp", url.Host) // NOTE: Dial takes just the Host part of the URL
-		fatalIf(err)
-		s.connections <- c // Save connection so we can Close() when start() ends
-		addr := strings.TrimPrefix(url.Path, "/")
-		opts := []electron.LinkOption{electron.Source(addr)}
 		/*if *prefetch > 0 {
 		  opts = append(opts, electron.Capacity(*prefetch), electron.Prefetch(true))
 		}*/
-		r, err := c.Receiver(opts...)
-		fatalIf(err)
+		r, err := s.connect()
+		if err != nil {
+			log.Fatalf("Could not connect to Qpid-dispatch router. is it running? : %v", err)
+		}
 		// Loop receiving messages and sending them to the main() goroutine
 		if s.msgcount == -1 {
 			for {
 				if rm, err := r.Receive(); err == nil {
 					rm.Accept()
+					debugr("AMQP Receiving messages.")
 					messages <- rm.Message
 				} else if err == electron.Closed {
 					log.Fatalf("Connection Closed %v: %v", s.urlStr, err)
 					return
 				} else {
-					log.Fatalf("receive error %v: %v", s.urlStr, err)
+					log.Printf("AMQP Listener error, will try to reconnect %v: %v\n", s.urlStr, err)
+					debugr("AMQP Receiver trying to connect")
+
+				CONNECTIONLOOP:
+					for {
+						s.Close()
+						log.Println("Reconnect attempt in 2 secs")
+						time.Sleep(2 * time.Second)
+						r, err = s.connect()
+
+						debugr("%v", err)
+						if err == nil {
+							log.Println("Connection with QDR established.")
+							break CONNECTIONLOOP
+						}
+					}
+
 				}
 			}
 		} else {
@@ -153,9 +167,30 @@ func (s *AMQPServer) start() {
 		debugr("Debug: Sending message to Notifier channel")
 		s.notifier <- amqpBinary.String()
 	}
-
 	//wait.Wait() // Wait for all goroutines to finish.
+}
 
+func (s *AMQPServer) connect() (electron.Receiver, error) {
+	// Wait for one goroutine per URL
+	container := electron.NewContainer(fmt.Sprintf("receive[%v]", os.Getpid()))
+	//connections := make(chan electron.Connection, 1) // Connections to close on exit
+	url, err := amqp.ParseURL(s.urlStr)
+	debugr("Parsing %s\n", s.urlStr)
+	fatalIf(err)
+	c, err := container.Dial("tcp", url.Host) // NOTE: Dial takes just the Host part of the URL
+	if err != nil {
+		log.Printf("AMQP Dial tcp %v\n", err)
+		return nil, err
+	}
+
+	s.connections <- c // Save connection so we can Close() when start() ends
+	addr := strings.TrimPrefix(url.Path, "/")
+	opts := []electron.LinkOption{electron.Source(addr)}
+	/*if *prefetch > 0 {
+		opts = append(opts, electron.Capacity(*prefetch), electron.Prefetch(true))
+	}*/
+	r, err := c.Receiver(opts...)
+	return r, err
 }
 
 func fatalIf(err error) {
