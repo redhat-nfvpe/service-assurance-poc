@@ -1,4 +1,4 @@
-package amqplistener
+package amqp10
 
 import (
 	"testing"
