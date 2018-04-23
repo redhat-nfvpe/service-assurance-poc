@@ -173,43 +173,43 @@ func main() {
 				id, err := elasticClient.Create(indexName, indexType, event)
 				if err != nil {
 					log.Printf("Error creating event %s in elastic search %s\n", event, err)
-				} else {
-					//update AlertManager
-					if serverConfig.AlertManagerEnabled {
-						go func() {
-							var alert = &alerts.Alerts{}
-							var jsonStr = []byte(event)
-							generatorURL := fmt.Sprintf("%s/%s/%s/%s", serverConfig.ElasticHostURL, indexName, indexType, id)
-							alert.Parse(jsonStr, generatorURL)
-							debuge("Debug:Sending alert..%#v\n", alert)
-							debuge("Debug:Generator URL %s\n", generatorURL)
-							jsonString, err := json.Marshal(*alert)
-							if err != nil {
-								panic(err)
-							}
-							var jsonEvent = []byte("[" + string(jsonString) + "]")
-							//var jsonEvent = string(jsonString)
-							//b := new(bytes.Buffer)
-							//json.NewEncoder(b).Encode(jsonEvent)
-							debuge("Debug:Posting to  %#s\n", serverConfig.AlertManagerURL)
+				} // else {
+				//update AlertManager
+				if serverConfig.AlertManagerEnabled {
+					go func() {
+						var alert = &alerts.Alerts{}
+						var jsonStr = []byte(event)
+						generatorURL := fmt.Sprintf("%s/%s/%s/%s", serverConfig.ElasticHostURL, indexName, indexType, id)
+						alert.Parse(jsonStr, generatorURL)
+						debuge("Debug:Sending alert..%#v\n", alert)
+						debuge("Debug:Generator URL %s\n", generatorURL)
+						jsonString, err := json.Marshal(*alert)
+						if err != nil {
+							panic(err)
+						}
+						var jsonEvent = []byte("[" + string(jsonString) + "]")
+						//var jsonEvent = string(jsonString)
+						//b := new(bytes.Buffer)
+						//json.NewEncoder(b).Encode(jsonEvent)
+						debuge("Debug:Posting to  %#s\n", serverConfig.AlertManagerURL)
 
-							req, err := http.NewRequest("POST", serverConfig.AlertManagerURL, bytes.NewBuffer(jsonEvent))
-							req.Header.Set("X-Custom-Header", "smartgateway")
-							req.Header.Set("Content-Type", "application/json")
+						req, err := http.NewRequest("POST", serverConfig.AlertManagerURL, bytes.NewBuffer(jsonEvent))
+						req.Header.Set("X-Custom-Header", "smartgateway")
+						req.Header.Set("Content-Type", "application/json")
 
-							client := &http.Client{}
-							resp, err := client.Do(req)
-							if err != nil {
-								panic(err)
-							}
-							defer resp.Body.Close()
-							body, _ := ioutil.ReadAll(resp.Body)
-							debuge("Debug:response Status:%s\n", resp.Status)
-							debuge("Debug:response Headers:%s\n", resp.Header)
-							debuge("Debug:response Body:%s\n", string(body))
+						client := &http.Client{}
+						resp, err := client.Do(req)
+						if err != nil {
+							panic(err)
+						}
+						defer resp.Body.Close()
+						body, _ := ioutil.ReadAll(resp.Body)
+						debuge("Debug:response Status:%s\n", resp.Status)
+						debuge("Debug:response Headers:%s\n", resp.Header)
+						debuge("Debug:response Body:%s\n", string(body))
 
-						}()
-					}
+					}()
+					//}
 				}
 			}
 
