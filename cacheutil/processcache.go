@@ -1,16 +1,27 @@
 package cacheutil
 
 import (
+	"log"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
 	"github.com/redhat-nfvpe/service-assurance-poc/tsdb"
-	"log"
 )
 
+//AddHeartBeat ...
+func AddHeartBeat(instance string, ch chan<- prometheus.Metric) {
+	m, err := tsdb.NewHeartBeatMetric(instance)
+	if err != nil {
+		log.Printf("newHeartBeat: %v for %s", err, instance)
+	}
+	ch <- m
+}
+
 //FlushPrometheusMetric   generate Prometheus metrics
-func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheus.Metric) {
+func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheus.Metric) bool {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
+	minMetericCreated := false //..minimum of one metrics created
 	for _, IncomingDataInterface := range shard.plugin {
 		if collectd, ok := IncomingDataInterface.(*incoming.Collectd); ok {
 			if collectd.ISNew() {
@@ -22,6 +33,7 @@ func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheu
 						continue
 					}
 					ch <- m
+					minMetericCreated = true
 				}
 			} else {
 				//clean up if data is not access for max TTL specified
@@ -32,6 +44,7 @@ func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheu
 			}
 		}
 	}
+	return minMetericCreated
 }
 
 //FlushAllMetrics   Generic Flushing metrics not used.. used only for testing

@@ -29,6 +29,7 @@ var alertStatus = map[string]string{
 	"FAILURE": "firing",
 }
 
+//SetSummary ...
 func (a *Alerts) SetSummary() {
 	values := make([]string, 0, 4)
 	if val, ok := a.Labels["summary"]; ok {
@@ -46,7 +47,7 @@ func (a *Alerts) SetSummary() {
 		}
 	}
 
-	log.Printf("SUMMAR %s", values)
+	//log.Printf("alert summary %s", values)
 	a.Annotations["summary"] = strings.Join(values, " ")
 }
 
