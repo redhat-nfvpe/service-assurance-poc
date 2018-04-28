@@ -36,7 +36,7 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s (options) ampq://... \n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s (options) amqp://... \n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "options:\n")
 	flag.PrintDefaults()
 }
@@ -94,11 +94,11 @@ func (m *plugin) GetMetricMessage(nthSend int, msgInJSON int) (msg string) {
 	*/
 }
 
-func generateHosts(hostsNum int, pluginNum int, intervalSec int) []host {
+func generateHosts(hostPrefix *string, hostsNum int, pluginNum int, intervalSec int) []host {
 
 	hosts := make([]host, hostsNum)
 	for i := 0; i < hostsNum; i++ {
-		hosts[i].name = fmt.Sprintf(hostnameTemplate, i)
+		hosts[i].name = *hostPrefix + fmt.Sprintf(hostnameTemplate, i)
 		hosts[i].plugins = make([]plugin, pluginNum)
 		for j := 0; j < pluginNum; j++ {
 			hosts[i].plugins[j].name =
@@ -205,6 +205,7 @@ func main() {
 	// parse command line option
 	hostsNum := flag.Int("hosts", 1, "Number of hosts to simulate")
 	metricsNum := flag.Int("metrics", 1, "Metrics per AMQP messages")
+	prefixString := flag.String("hostprefix", "", "Host prefix")
 	messagesNum := flag.Int("messages", 1, "Messages per interval")
 	intervalSec := flag.Int("interval", 1, "Interval (sec)")
 	metricMaxSend := flag.Int("send", 1, "How many metrics sent")
@@ -217,11 +218,11 @@ func main() {
 
 	urls := flag.Args()
 	if len(urls) == 0 {
-		fmt.Fprintln(os.Stderr, "ampq URL is missing")
+		fmt.Fprintln(os.Stderr, "amqp URL is missing")
 		usage()
 		os.Exit(1)
 	} else if len(urls) > 1 {
-		fmt.Fprintln(os.Stderr, "Only one ampq URL is supported")
+		fmt.Fprintln(os.Stderr, "Only one amqp URL is supported")
 		usage()
 		os.Exit(1)
 	}
@@ -236,7 +237,7 @@ func main() {
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	hosts := generateHosts(*hostsNum, *messagesNum, *intervalSec)
+	hosts := generateHosts(prefixString, *hostsNum, *messagesNum, *intervalSec)
 
 	if *modeString == "limit" {
 		getMessagesLimit(urls[0], *metricsNum, *pprofileFileName != "")
