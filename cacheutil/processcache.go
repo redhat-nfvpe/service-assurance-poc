@@ -21,7 +21,7 @@ func AddHeartBeat(instance string, ch chan<- prometheus.Metric) {
 func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheus.Metric) bool {
 	shard.lock.Lock()
 	defer shard.lock.Unlock()
-	minMetericCreated := false //..minimum of one metrics created
+	minMetricCreated := false //..minimum of one metrics created
 	for _, IncomingDataInterface := range shard.plugin {
 		if collectd, ok := IncomingDataInterface.(*incoming.Collectd); ok {
 			if collectd.ISNew() {
@@ -33,7 +33,7 @@ func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheu
 						continue
 					}
 					ch <- m
-					minMetericCreated = true
+					minMetricCreated = true
 				}
 			} else {
 				//clean up if data is not access for max TTL specified
@@ -44,7 +44,7 @@ func (shard *ShardedIncomingDataCache) FlushPrometheusMetric(ch chan<- prometheu
 			}
 		}
 	}
-	return minMetericCreated
+	return minMetricCreated
 }
 
 //FlushAllMetrics   Generic Flushing metrics not used.. used only for testing
