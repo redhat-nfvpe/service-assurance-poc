@@ -44,13 +44,19 @@ func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
 //need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
+
 	ch <- lastPull
 	allHosts := c.cache.GetHosts()
 	debugm("Debug:Prometheus is requesting to scrape metrics...")
 	for key, plugin := range allHosts {
 		//fmt.Fprintln(w, hostname)
 		debugm("Debug:Getting metrics for host %s  with total plugin size %d\n", key, plugin.Size())
-		plugin.FlushPrometheusMetric(ch)
+		if plugin.FlushPrometheusMetric(ch) == true {
+			// add heart if there is atleast one new metrics for the host
+			debugm("Debug:Adding heartbeat for host %s.", key)
+			cacheutil.AddHeartBeat(key, ch)
+		}
+
 		//this will clean up all zero plugins
 		if plugin.Size() == 0 {
 			debugm("Debug:Cleaning all empty plugins.")
