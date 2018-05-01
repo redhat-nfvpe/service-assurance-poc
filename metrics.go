@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
+	"github.com/redhat-nfvpe/service-assurance-poc/api"
 	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
@@ -21,31 +22,24 @@ import (
 )
 
 var debugm = func(format string, data ...interface{}) {} // Default no debugging output
-var (
-	lastPull = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "sa_collectd_last_pull_timestamp_seconds",
-			Help: "Unix timestamp of the last received collectd metrics pull in seconds.",
-		},
-	)
-)
 
 /*************** HTTP HANDLER***********************/
 type cacheHandler struct {
-	cache *cacheutil.IncomingDataCache
+	cache    *cacheutil.IncomingDataCache
+	appstate *apihandler.MetricHandler
 }
 
 // Describe implements prometheus.Collector.
 func (c *cacheHandler) Describe(ch chan<- *prometheus.Desc) {
-	ch <- lastPull.Desc()
+	c.appstate.Describe(ch)
 }
 
 // Collect implements prometheus.Collector.
 //need improvement add lock etc etc
 func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
-	lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
-
-	ch <- lastPull
+	//lastPull.Set(float64(time.Now().UnixNano()) / 1e9)
+	c.appstate.Collect(ch)
+	//ch <- lastPull
 	allHosts := c.cache.GetHosts()
 	debugm("Debug:Prometheus is requesting to scrape metrics...")
 	for key, plugin := range allHosts {
@@ -54,7 +48,9 @@ func (c *cacheHandler) Collect(ch chan<- prometheus.Metric) {
 		if plugin.FlushPrometheusMetric(ch) == true {
 			// add heart if there is atleast one new metrics for the host
 			debugm("Debug:Adding heartbeat for host %s.", key)
-			cacheutil.AddHeartBeat(key, ch)
+			cacheutil.AddHeartBeat(key, 1.0, ch)
+		} else {
+			cacheutil.AddHeartBeat(key, 0.0, ch)
 		}
 
 		//this will clean up all zero plugins
@@ -140,19 +136,39 @@ func main() {
 		os.Exit(1)
 	}
 
+	//Block -starts
+	//Set up signal Go routine
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	go func() {
+		for sig := range signalCh {
+			// sig is a ^C, handle it
+			log.Printf("caught sig: %+v", sig)
+			log.Println("Wait for 2 second to finish processing")
+			time.Sleep(2 * time.Second)
+			os.Exit(0)
+		}
+	}()
+
 	//Cache sever to process and serve the exporter
 	cacheServer := cacheutil.NewCacheServer(cacheutil.MAXTTL, serverConfig.Debug)
+	type MetricHandler struct {
+		applicationHealth *cacheutil.ApplicationHealthCache
+		lastPull          *prometheus.Desc
+		qpidRouterState   *prometheus.Desc
+	}
 
-	myHandler := &cacheHandler{cache: cacheServer.GetCache()}
+	applicationHealth := cacheutil.NewApplicationHealthCache()
+	appStateHandler := apihandler.NewAppStateMetricHandler(applicationHealth)
+	myHandler := &cacheHandler{cache: cacheServer.GetCache(), appstate: appStateHandler}
+	prometheus.MustRegister(myHandler)
 
 	if serverConfig.CPUStats == false {
 		// Including these stats kills performance when Prometheus polls with multiple targets
 		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
 		prometheus.Unregister(prometheus.NewGoCollector())
 	}
-
-	prometheus.MustRegister(myHandler)
-
+	//Set up Metric Exporter
 	handler := http.NewServeMux()
 	handler.Handle("/metrics", prometheus.Handler())
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -171,17 +187,6 @@ func main() {
 	handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			// sig is a ^C, handle it
-			log.Printf("caught sig: %+v", sig)
-			log.Println("Wait for 2 second to finish processing")
-			time.Sleep(2 * time.Second)
-			os.Exit(0)
-		}
-	}()
 	debugm("Debug: Config %#v\n", serverConfig)
 	//run exporter fro prometheus to scrape
 	go func() {
@@ -218,12 +223,11 @@ func main() {
 
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
-		metricsNotifier := make(chan string) // Channel for messages from goroutines to main()
 		var amqpMetricServer *amqp10.AMQPServer
 		///Metric Listener
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		log.Printf("Connecting to AMQP1 : %s\n", amqpMetricsurl)
-		amqpMetricServer = amqp10.NewAMQPServer(amqpMetricsurl, serverConfig.Debug, serverConfig.DataCount, metricsNotifier)
+		amqpMetricServer = amqp10.NewAMQPServer(amqpMetricsurl, serverConfig.Debug, serverConfig.DataCount)
 		log.Printf("Listening.....\n")
 
 		for {
@@ -233,7 +237,9 @@ func main() {
 				incomingType := incoming.NewInComing(incoming.COLLECTD)
 				incomingType.ParseInputJSON(data)
 				cacheServer.Put(incomingType)
-				continue
+				continue // priority channel
+			case status := <-amqpMetricServer.GetStatus():
+				applicationHealth.QpidRouterState = status
 			default:
 				//no activity
 			}

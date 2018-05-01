@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/alerts"
 	"github.com/redhat-nfvpe/service-assurance-poc/amqp"
 	"github.com/redhat-nfvpe/service-assurance-poc/api"
+	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 	"github.com/redhat-nfvpe/service-assurance-poc/elasticsearch"
 
@@ -44,6 +46,8 @@ func eventusage() {
 
 var debuge = func(format string, data ...interface{}) {} // Default no debugging output
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	// set flags for parsing options
 	flag.Usage = eventusage
 	fDebug := flag.Bool("debug", false, "Enable debug")
@@ -53,7 +57,7 @@ func main() {
 	fAlertManagerURL := flag.String("alertmanager", "", "(Optional)AlertManager endpoint http://localhost:9090/v1/api/alert")
 	fAPIEndpointURL := flag.String("apiurl", "", "(Optional)API endpoint localhost:8082")
 	fAMQP1PublishURL := flag.String("amqppublishurl", "", "(Optional) AMQP1.0 event publish address 127.0.0.1:5672/collectd/alert")
-	fRestIndex := flag.Bool("resetIndex", false, "Optional Clean all index before on start (default false)")
+	fResetIndex := flag.Bool("resetIndex", false, "Optional Clean all index before on start (default false)")
 
 	flag.Parse()
 	var serverConfig saconfig.EventConfiguration
@@ -71,8 +75,8 @@ func main() {
 				APIEndpointURL:  *fAPIEndpointURL,
 				AMQP1PublishURL: *fAMQP1PublishURL,
 			},
-			RestIndex: *fRestIndex,
-			Debug:     *fDebug,
+			ResetIndex: *fResetIndex,
+			Debug:      *fDebug,
 		}
 
 	}
@@ -121,20 +125,23 @@ func main() {
 		log.Println("AMQP1.0 Publish address disabled")
 	}
 
-	/* PRINT COnfiguration deatisl */
+	/* Print Configuration detials */
+	//mertic handler for event mertics to check health status
+	applicationHealth := cacheutil.NewApplicationHealthCache()
+	metricHandler := apihandler.NewAppStateEventMetricHandler(applicationHealth)
 	debuge("Debug:Config %#v\n", serverConfig)
-	eventsNotifier := make(chan string) // Channel for messages from goroutines to main()
 
 	var amqpEventServer *amqp10.AMQPServer
 	///Metric Listener
 	amqpEventsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1EventURL)
 	log.Printf("Connecting to AMQP1 : %s\n", amqpEventsurl)
-	amqpEventServer = amqp10.NewAMQPServer(amqpEventsurl, serverConfig.Debug, -1, eventsNotifier)
+	amqpEventServer = amqp10.NewAMQPServer(amqpEventsurl, serverConfig.Debug, -1)
 
 	log.Printf("Listening.....\n")
 	var elasticClient *saelastic.ElasticClient
 	log.Printf("Connecting to ElasticSearch : %s\n", serverConfig.ElasticHostURL)
-	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL, serverConfig.RestIndex, serverConfig.Debug)
+	elasticClient = saelastic.CreateClient(serverConfig.ElasticHostURL, serverConfig.ResetIndex, serverConfig.Debug)
+	applicationHealth.ElasticSearchState = 1
 
 	/**** HTTP Listener for alerts from alert manager *******************************
 	*
@@ -142,14 +149,21 @@ func main() {
 	********************************************************************************/
 	//configure http alert route to amqp1.0
 	if serverConfig.APIEnabled {
+		prometheus.MustRegister(metricHandler)
+		// Including these stats kills performance when Prometheus polls with multiple targets
+		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
+		prometheus.Unregister(prometheus.NewGoCollector())
+
 		context := apihandler.NewAPIContext(serverConfig)
 		http.Handle("/alert", apihandler.Handler{context, apihandler.AlertHandler}) //creates writer everytime api is called.
+		http.Handle("/metrics", prometheus.Handler())
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`<html>
 																	<head><title>Smart Gateway Event API</title></head>
 																	<body>
 																	<h1>APi </h1>
-																	/alerts Post alerts in Json Format on to amqp bus
+																	/alerts Post alerts in Json Format on to amqp bus</br>
+																	/metrics get metric data
 																	</body>
 																	</html>`))
 		})
@@ -162,6 +176,7 @@ func main() {
 	}
 	log.Println("Ready....")
 
+	// start processing  events from QDR
 	for {
 		select {
 		case event := <-amqpEventServer.GetNotifier():
@@ -169,10 +184,13 @@ func main() {
 			indexName, indexType, err := saelastic.GetIndexNameType(event)
 			if err != nil {
 				log.Printf("Failed to read event %s type in main %s\n", event, err)
+				applicationHealth.ElasticSearchState = 0
 			} else {
 				id, err := elasticClient.Create(indexName, indexType, event)
+				applicationHealth.ElasticSearchState = 1
 				if err != nil {
 					log.Printf("Error creating event %s in elastic search %s\n", event, err)
+					applicationHealth.ElasticSearchState = 0
 				} // else {
 				//update AlertManager
 				if serverConfig.AlertManagerEnabled {
@@ -188,15 +206,10 @@ func main() {
 							panic(err)
 						}
 						var jsonEvent = []byte("[" + string(jsonString) + "]")
-						//var jsonEvent = string(jsonString)
-						//b := new(bytes.Buffer)
-						//json.NewEncoder(b).Encode(jsonEvent)
 						debuge("Debug:Posting to  %#s\n", serverConfig.AlertManagerURL)
-
 						req, err := http.NewRequest("POST", serverConfig.AlertManagerURL, bytes.NewBuffer(jsonEvent))
 						req.Header.Set("X-Custom-Header", "smartgateway")
 						req.Header.Set("Content-Type", "application/json")
-
 						client := &http.Client{}
 						resp, err := client.Do(req)
 						if err != nil {
@@ -212,8 +225,9 @@ func main() {
 					//}
 				}
 			}
-
-			continue
+			continue // priority channel
+		case status := <-amqpEventServer.GetStatus():
+			applicationHealth.QpidRouterState = status
 		default:
 			//no activity
 		}
