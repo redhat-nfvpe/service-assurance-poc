@@ -9,8 +9,8 @@ import (
 )
 
 //AddHeartBeat ...
-func AddHeartBeat(instance string, ch chan<- prometheus.Metric) {
-	m, err := tsdb.NewHeartBeatMetric(instance)
+func AddHeartBeat(instance string, value float64, ch chan<- prometheus.Metric) {
+	m, err := tsdb.NewHeartBeatMetricByHost(instance, value)
 	if err != nil {
 		log.Printf("newHeartBeat: %v for %s", err, instance)
 	}

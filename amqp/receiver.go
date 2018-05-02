@@ -20,7 +20,6 @@ under the License.
 package amqp10
 
 import (
-	//	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -29,7 +28,6 @@ import (
 
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
-	//  "reflect"
 )
 
 // Usage and command-line flags
@@ -49,6 +47,7 @@ type AMQPServer struct {
 	debug       bool
 	msgcount    int
 	notifier    chan string
+	status      chan int
 	connections chan electron.Connection
 }
 
@@ -61,7 +60,7 @@ func MockAmqpServer(notifier chan string) *AMQPServer {
 }
 
 //NewAMQPServer   ...
-func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string) *AMQPServer {
+func NewAMQPServer(urlStr string, debug bool, msgcount int) *AMQPServer {
 	if len(urlStr) == 0 {
 		log.Println("No URL provided")
 		//usage()
@@ -70,12 +69,15 @@ func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string
 	server := &AMQPServer{
 		urlStr:      urlStr,
 		debug:       debug,
-		notifier:    notifier,
+		notifier:    make(chan string),
+		status:      make(chan int),
 		msgcount:    msgcount,
 		connections: make(chan electron.Connection, 1),
 	}
 	if debug {
-		debugr = func(format string, data ...interface{}) { log.Printf(format, data...) }
+		debugr = func(format string, data ...interface{}) {
+			log.Printf(format, data...)
+		}
 	}
 	// Spawn off the server's main loop immediately
 	// not exported
@@ -86,6 +88,11 @@ func NewAMQPServer(urlStr string, debug bool, msgcount int, notifier chan string
 //GetNotifier  Get notifier
 func (s *AMQPServer) GetNotifier() chan string {
 	return s.notifier
+}
+
+//GetStatus  Get Status
+func (s *AMQPServer) GetStatus() chan int {
+	return s.status
 }
 
 //Close connections it is exported so users can force close
@@ -103,7 +110,9 @@ func (s *AMQPServer) Close() {
 //start  starts amqp server
 func (s *AMQPServer) start() {
 	messages := make(chan amqp.Message) // Channel for messages from goroutines to main()
+	connectionStatus := make(chan int)
 	defer close(messages)
+	defer close(connectionStatus)
 	//var wait sync.WaitGroup // Used by main() to wait for all goroutines to end.
 	//wait.Add(1)
 	go func() {
@@ -114,6 +123,7 @@ func (s *AMQPServer) start() {
 		if err != nil {
 			log.Fatalf("Could not connect to Qpid-dispatch router. is it running? : %v", err)
 		}
+		s.status <- 1
 		// Loop receiving messages and sending them to the main() goroutine
 		if s.msgcount == -1 {
 			for {
@@ -123,10 +133,12 @@ func (s *AMQPServer) start() {
 					messages <- rm.Message
 				} else if err == electron.Closed {
 					log.Fatalf("Connection Closed %v: %v", s.urlStr, err)
+					connectionStatus <- 0
 					return
 				} else {
 					log.Printf("AMQP Listener error, will try to reconnect %v: %v\n", s.urlStr, err)
 					debugr("AMQP Receiver trying to connect")
+					connectionStatus <- 0
 
 				CONNECTIONLOOP:
 					for {
@@ -134,10 +146,10 @@ func (s *AMQPServer) start() {
 						log.Println("Reconnect attempt in 2 secs")
 						time.Sleep(2 * time.Second)
 						r, err = s.connect()
-
 						debugr("%v", err)
 						if err == nil {
 							log.Println("Connection with QDR established.")
+							connectionStatus <- 1
 							break CONNECTIONLOOP
 						}
 					}
@@ -161,11 +173,17 @@ func (s *AMQPServer) start() {
 	//outside go routin reciveve and process
 	//var firstmsg=0
 	for {
-		m := <-messages
-		debugr("Debug: Getting message from AMQP%v\n", m.Body())
-		amqpBinary := m.Body().(amqp.Binary)
-		debugr("Debug: Sending message to Notifier channel")
-		s.notifier <- amqpBinary.String()
+		select {
+		case m := <-messages:
+			debugr("Debug: Getting message from AMQP%v\n", m.Body())
+			amqpBinary := m.Body().(amqp.Binary)
+			debugr("Debug: Sending message to Notifier channel")
+			s.notifier <- amqpBinary.String()
+			continue //priority to process exiting messages
+		case status := <-connectionStatus:
+			s.status <- status
+		default: //default makes this non-blocking
+		}
 	}
 	//wait.Wait() // Wait for all goroutines to finish.
 }

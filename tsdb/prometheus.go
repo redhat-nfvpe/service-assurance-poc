@@ -3,7 +3,6 @@ package tsdb
 import (
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
@@ -13,18 +12,15 @@ var (
 	metricNameRe = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
 
-//NewHeartBeatMetric ...
-func NewHeartBeatMetric(instance string) (prometheus.Metric, error) {
-	var value float64
+//NewHeartBeatMetricByHost ...
+func NewHeartBeatMetricByHost(instance string, value float64) (prometheus.Metric, error) {
 	var valueType prometheus.ValueType
 	valueType = prometheus.GaugeValue
-	value = float64(time.Now().Unix())
-	metricName := "sa_collectd_last_heartbeat_seconds"
-	help := fmt.Sprintf("Unix timestamp of the last received collectd metrics pull in seconds.: '%s'",
-		instance)
+	metricName := "sa_collectd_last_metric_for_host_status"
+	help := "Status of metrics for host currently active."
 
 	plabels := prometheus.Labels{}
-	plabels["instance"] = instance
+	plabels["source"] = instance
 	desc := prometheus.NewDesc(metricName, help, []string{}, plabels)
 	return prometheus.NewConstMetric(desc, valueType, value)
 }

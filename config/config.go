@@ -16,7 +16,7 @@ type EventConfiguration struct {
 	AlertManagerEnabled bool
 	APIEnabled          bool
 	PublishEventEnabled bool
-	RestIndex           bool
+	ResetIndex          bool
 	IgnoreString        string `json:"-"`
 }
 

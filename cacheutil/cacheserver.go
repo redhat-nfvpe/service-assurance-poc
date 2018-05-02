@@ -15,6 +15,23 @@ var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
 var debugc = func(format string, data ...interface{}) {} // Default no debugging output
 
+//ApplicationHealthCache  ...
+type ApplicationHealthCache struct {
+	QpidRouterState    int
+	ElasticSearchState int
+	LastAccess         int64 //timestamp in seconds
+}
+
+//NewApplicationHealthCache  ..
+func NewApplicationHealthCache() *ApplicationHealthCache {
+	return &ApplicationHealthCache{
+		QpidRouterState:    0,
+		LastAccess:         0,
+		ElasticSearchState: 0,
+	}
+
+}
+
 //IncomingBuffer  this is inut data send to cache server
 //IncomingBuffer  ..its of type collectd or anything else
 type IncomingBuffer struct {
