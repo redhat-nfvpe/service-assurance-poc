@@ -19,8 +19,10 @@ load them into the `chroot` with a custom root configuration file.
 
 You'll need to install the following dependencies:
 
-* git
-* mock
+* `git`
+* `mock`
+
+Install the dependencies with the following command.
 
     sudo yum install git mock -y
 
