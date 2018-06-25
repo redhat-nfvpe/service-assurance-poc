@@ -53,6 +53,11 @@ type (
 	}
 )
 
+//ExitFunc  ...
+func ExitFunc(response http.ResponseWriter, request *http.Request) {
+	log.Fatal("/exit handler called")
+}
+
 //NewAPIContext ...
 func NewAPIContext(serverConfig saconfig.EventConfiguration) *APIContext {
 	amqpPublishurl := fmt.Sprintf("amqp://%s", serverConfig.API.AMQP1PublishURL)

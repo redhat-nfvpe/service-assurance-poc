@@ -14,6 +14,7 @@ var MAXTTL int64 = 300
 var freeList = make(chan *IncomingBuffer, 100)
 var quitCacheServerCh = make(chan struct{})
 var debugc = func(format string, data ...interface{}) {} // Default no debugging output
+var wgCacheServer sync.WaitGroup
 
 //ApplicationHealthCache  ...
 type ApplicationHealthCache struct {
@@ -192,7 +193,8 @@ func NewCacheServer(maxTTL int64, debug bool) *CacheServer {
 		debugc = func(format string, data ...interface{}) { log.Printf(format, data...) }
 	}
 	// Spawn off the server's main loop immediately
-	go server.loop()
+	wgCacheServer.Add(1)
+	go server.loop(&wgCacheServer)
 	return server
 }
 
@@ -210,27 +212,38 @@ func (cs *CacheServer) Put(incomingData incoming.DataTypeInterface) {
 
 }
 
-func (cs CacheServer) close() {
-	<-quitCacheServerCh
+//Close close cache server
+func (cs CacheServer) Close() {
+	//<-quitCacheServerCh
 	close(quitCacheServerCh)
+	log.Println("Waiting for Cache server to close")
+	wgCacheServer.Wait()
+
 }
-func (cs CacheServer) loop() {
+func (cs CacheServer) loop(wgCacheServer *sync.WaitGroup) {
+	defer wgCacheServer.Done()
+	var buffer *IncomingBuffer
+
 	// The built-in "range" clause can iterate over channels,
 	// amongst other things
-LOOP:
 	for {
 		// Reuse buffer if there's room.
-		buffer := <-cs.ch
-		shard := cs.cache.GetShard(buffer.data.GetKey())
-		shard.SetData(buffer.data)
 		select {
-		case freeList <- buffer:
-		// Buffer on free list; nothing more to do.
+		case buffer := <-cs.ch:
+			shard := cs.cache.GetShard(buffer.data.GetKey())
+			shard.SetData(buffer.data)
 		case <-quitCacheServerCh:
-			break LOOP
+			log.Println("Shutting down Cache server")
+			return
+			select {
+			case freeList <- buffer:
+				// Buffer on free list; nothing more to do.
+			default:
+				// Free list full, just carry on.
+			}
 		default:
-			// Free list full, just carry on.
 		}
+
 		/*select {
 		case data := <-s.ch:
 			//fmt.Printf("got message in channel %v", data)

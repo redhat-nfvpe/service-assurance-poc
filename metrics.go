@@ -10,6 +10,7 @@ import (
 	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 	"github.com/redhat-nfvpe/service-assurance-poc/incoming"
+	"github.com/redhat-nfvpe/service-assurance-poc/webserver"
 
 	"flag"
 	"fmt"
@@ -17,11 +18,28 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 )
 
-var debugm = func(format string, data ...interface{}) {} // Default no debugging output
+var (
+	shutdown         = make(chan struct{})
+	done             = make(chan bool)
+	cacheServer      cacheutil.CacheServer
+	amqpMetricServer *amqp10.AMQPServer
+	debugm           = func(format string, data ...interface{}) {} // Default no debugging output
+	m1               runtime.MemStats
+	m2               runtime.MemStats
+	serverConfig     saconfig.MetricConfiguration
+	wg               sync.WaitGroup
+)
+
+func closeAll() {
+	close(shutdown)
+	cacheServer.Close()
+	log.Println("Sending shutdown signal..")
+}
 
 /*************** HTTP HANDLER***********************/
 type cacheHandler struct {
@@ -81,13 +99,20 @@ func metricusage() {
 	********************* Sample Data *********************
 	$go run metrics/main.go -mhost=localhost -mport=8081 -usesample=true -h=10 -p=100 -t=-1 -debug
 	*************************************************************`)
-	fmt.Fprintln(os.Stderr, `Required commandline argument missing`)
+	fmt.Fprintln(os.Stderr, `Required commandline argumshutdownent missing`)
 	fmt.Fprintln(os.Stdout, doc)
 	flag.PrintDefaults()
 }
-
+func printMemStats() {
+	runtime.ReadMemStats(&m2)
+	debugm("Number of goroutines: %d\n", runtime.NumGoroutine())
+	debugm("Memory: %.2f bytes\n", float64(m2.Sys-m1.Sys)/float64(runtime.NumGoroutine()))
+}
 func main() {
 	// set flags for parsing options
+
+	runtime.ReadMemStats(&m1)
+	printMemStats()
 	flag.Usage = metricusage
 	fDebug := flag.Bool("debug", false, "Enable debug")
 	fConfigLocation := flag.String("config", "", "Path to configuration file(optional).if provided ignores all command line options")
@@ -103,7 +128,7 @@ func main() {
 	fIterations := flag.Int("t", 1, "No of times to run sample data (default 1) -1 for ever.")
 
 	flag.Parse()
-	var serverConfig saconfig.MetricConfiguration
+
 	if len(*fConfigLocation) > 0 { //load configuration
 		serverConfig = saconfig.LoadMetricConfig(*fConfigLocation)
 		if *fDebug {
@@ -140,17 +165,24 @@ func main() {
 	//Set up signal Go routine
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
+	printMemStats()
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for sig := range signalCh {
-			// sig is a ^C, handle it
 			log.Printf("caught sig: %+v", sig)
-			log.Println("Wait for 2 second to finish processing")
+			printMemStats()
 			time.Sleep(2 * time.Second)
-			os.Exit(0)
+			closeAll()
+			printMemStats()
+			//os.Exit(0)
+			done <- true
+			break
 		}
 	}()
 
 	//Cache sever to process and serve the exporter
+	log.Println("1. Startingup Cache Server")
 	cacheServer := cacheutil.NewCacheServer(cacheutil.MAXTTL, serverConfig.Debug)
 	type MetricHandler struct {
 		applicationHealth *cacheutil.ApplicationHealthCache
@@ -171,6 +203,7 @@ func main() {
 	//Set up Metric Exporter
 	handler := http.NewServeMux()
 	handler.Handle("/metrics", prometheus.Handler())
+
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
                                 <head><title>Collectd Exporter</title></head>
@@ -189,11 +222,13 @@ func main() {
 
 	debugm("Debug: Config %#v\n", serverConfig)
 	//run exporter fro prometheus to scrape
-	go func() {
-		metricsURL := fmt.Sprintf("%s:%d", serverConfig.Exporterhost, serverConfig.Exporterport)
-		log.Printf("Metric server at : %s\n", metricsURL)
-		log.Fatal(http.ListenAndServe(metricsURL, handler))
-	}()
+	//Goroutin #2 this will cleaned up
+
+	metricsURL := fmt.Sprintf("%s:%d", serverConfig.Exporterhost, serverConfig.Exporterport)
+	wg.Add(1)
+	webserver.WebServer(metricsURL, handler, &wg, shutdown)
+
+	log.Printf("Metric server at : %s\n", metricsURL)
 	time.Sleep(2 * time.Second)
 	log.Println("HTTP server is ready....")
 
@@ -204,7 +239,7 @@ func main() {
 			serverConfig.Sample.DataCount = 9999999
 		}
 		var hostwaitgroup sync.WaitGroup
-		fmt.Printf("Test data  will run for %d times ", serverConfig.Sample.DataCount)
+		log.Printf("Test data  will run for %d times ", serverConfig.Sample.DataCount)
 		for times := 1; times <= serverConfig.Sample.DataCount; times++ {
 			hostwaitgroup.Add(serverConfig.Sample.HostCount)
 			for hosts := 0; hosts < serverConfig.Sample.HostCount; hosts++ {
@@ -213,6 +248,7 @@ func main() {
 					hostname := fmt.Sprintf("%s_%d", "redhat.boston.nfv", host_id)
 					incomingType := incoming.NewInComing(incoming.COLLECTD)
 					debugm("Hostname %s IncomingType %#v", hostname, incomingType)
+					//wg.Add(1)
 					go cacheServer.GenrateSampleData(hostname, serverConfig.Sample.PluginCount, incomingType)
 				}(hosts)
 
@@ -223,15 +259,20 @@ func main() {
 
 	} else {
 		//aqp listener if sample is requested then amqp will not be used but random sample data will be used
-		var amqpMetricServer *amqp10.AMQPServer
 		///Metric Listener
+		log.Println("3. Starting up metric listener ")
 		amqpMetricsurl := fmt.Sprintf("amqp://%s", serverConfig.AMQP1MetricURL)
 		log.Printf("Connecting to AMQP1 : %s\n", amqpMetricsurl)
 		amqpMetricServer = amqp10.NewAMQPServer(amqpMetricsurl, serverConfig.Debug, serverConfig.DataCount)
-		log.Printf("Listening.....\n")
+		log.Printf("Listening.....Ready\n")
+		printMemStats()
 
+	LOOP:
 		for {
 			select {
+			case <-shutdown:
+				log.Println("Closing Incoming message listener")
+				break LOOP
 			case data := <-amqpMetricServer.GetNotifier():
 				debugm("Debug: Getting incoming data from notifier channel : %#v\n", data)
 				incomingType := incoming.NewInComing(incoming.COLLECTD)
@@ -246,5 +287,13 @@ func main() {
 		}
 	}
 	//TO DO: to close cache server on keyboard interrupt
+	debugm("awaiting signal")
+	<-done
+	debugm("Done signal recieved")
+	printMemStats()
+	wg.Wait()
+	printMemStats()
+	log.Println("Goodbye")
+	printMemStats()
 
 }

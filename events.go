@@ -5,8 +5,16 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/http/pprof"
 	"os/signal"
 	"time"
+
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"runtime"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,12 +24,23 @@ import (
 	"github.com/redhat-nfvpe/service-assurance-poc/cacheutil"
 	"github.com/redhat-nfvpe/service-assurance-poc/config"
 	"github.com/redhat-nfvpe/service-assurance-poc/elasticsearch"
-
-	"flag"
-	"fmt"
-	"log"
-	"os"
+	"github.com/redhat-nfvpe/service-assurance-poc/webserver"
 )
+
+var (
+	shutdown     = make(chan struct{})
+	done         = make(chan bool)
+	debuge       = func(format string, data ...interface{}) {} // Default no debugging output
+	m1           runtime.MemStats
+	m2           runtime.MemStats
+	serverConfig saconfig.EventConfiguration
+	wg           sync.WaitGroup
+)
+
+func closeAll() {
+	close(shutdown)
+	log.Println("Sending shutdown signal..")
+}
 
 /*************** main routine ***********************/
 // eventusage and command-line flags
@@ -44,9 +63,15 @@ func eventusage() {
 	flag.PrintDefaults()
 }
 
-var debuge = func(format string, data ...interface{}) {} // Default no debugging output
+func printMemStats() {
+	runtime.ReadMemStats(&m2)
+	debuge("Number of goroutines: %d\n", runtime.NumGoroutine())
+	debuge("Memory: %.2f bytes\n", float64(m2.Sys-m1.Sys)/float64(runtime.NumGoroutine()))
+}
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	runtime.ReadMemStats(&m1)
+	printMemStats()
 
 	// set flags for parsing options
 	flag.Usage = eventusage
@@ -60,7 +85,6 @@ func main() {
 	fResetIndex := flag.Bool("resetIndex", false, "Optional Clean all index before on start (default false)")
 
 	flag.Parse()
-	var serverConfig saconfig.EventConfiguration
 	if len(*fConfigLocation) > 0 { //load configuration
 		serverConfig = saconfig.LoadEventConfig(*fConfigLocation)
 		if *fDebug {
@@ -94,15 +118,22 @@ func main() {
 		eventusage()
 		os.Exit(1)
 	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	printMemStats()
+	wg.Add(1)
 	go func() {
-		for sig := range c {
-			// sig is a ^C, handle it
+		defer wg.Done()
+		for sig := range signalCh {
 			log.Printf("caught sig: %+v", sig)
-			log.Println("Wait for 2 second to finish processing")
+			printMemStats()
 			time.Sleep(2 * time.Second)
-			os.Exit(0)
+			closeAll()
+			printMemStats()
+			//os.Exit(0)
+			done <- true
+			break
 		}
 	}()
 
@@ -153,11 +184,14 @@ func main() {
 		// Including these stats kills performance when Prometheus polls with multiple targets
 		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
 		prometheus.Unregister(prometheus.NewGoCollector())
+		prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), ""))
+		prometheus.Unregister(prometheus.NewGoCollector())
 
 		context := apihandler.NewAPIContext(serverConfig)
-		http.Handle("/alert", apihandler.Handler{context, apihandler.AlertHandler}) //creates writer everytime api is called.
-		http.Handle("/metrics", prometheus.Handler())
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handler := http.NewServeMux()
+		handler.Handle("/alert", apihandler.Handler{context, apihandler.AlertHandler}) //creates writer everytime api is called.
+		handler.Handle("/metrics", prometheus.Handler())
+		handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`<html>
 																	<head><title>Smart Gateway Event API</title></head>
 																	<body>
@@ -167,18 +201,30 @@ func main() {
 																	</body>
 																	</html>`))
 		})
-		APIEndpointURL := fmt.Sprintf("%s", serverConfig.API.APIEndpointURL)
-		go func(APIEndpointURL string) {
-			log.Printf("APIEndpoint server ready at : %s\n", APIEndpointURL)
-			log.Fatal(http.ListenAndServe(APIEndpointURL, nil))
-		}(APIEndpointURL)
-		time.Sleep(2 * time.Second)
-	}
-	log.Println("Ready....")
+		// Register pprof handlers
+		handler.HandleFunc("/debug/pprof/", pprof.Index)
+		handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
+		APIEndpointURL := fmt.Sprintf("%s", serverConfig.API.APIEndpointURL)
+		wg.Add(1)
+		webserver.WebServer(APIEndpointURL, handler, &wg, shutdown)
+		log.Printf("Event API server at : %s\n", APIEndpointURL)
+		time.Sleep(2 * time.Second)
+		log.Println("HTTP server is ready....")
+		printMemStats()
+		log.Println("Ready")
+
+	}
 	// start processing  events from QDR
+LOOP:
 	for {
 		select {
+		case <-shutdown:
+			log.Println("Closing Incoming message listener")
+			break LOOP
 		case event := <-amqpEventServer.GetNotifier():
 			//log.Printf("Event occured : %#v\n", event)
 			indexName, indexType, err := saelastic.GetIndexNameType(event)
@@ -194,7 +240,9 @@ func main() {
 				} // else {
 				//update AlertManager
 				if serverConfig.AlertManagerEnabled {
+					wg.Add(1)
 					go func() {
+						defer wg.Done()
 						var alert = &alerts.Alerts{}
 						var jsonStr = []byte(event)
 						generatorURL := fmt.Sprintf("%s/%s/%s/%s", serverConfig.ElasticHostURL, indexName, indexType, id)
@@ -232,5 +280,13 @@ func main() {
 			//no activity
 		}
 	}
+	debuge("awaiting signal")
+	<-done
+	debuge("Done signal recieved")
+	printMemStats()
+	wg.Wait()
+	printMemStats()
+	log.Println("Goodbye")
+	printMemStats()
 
 }
