@@ -19,9 +19,6 @@ install:
 
 before_script:
   - $GOPATH/bin/dep ensure -v --vendor-only
-  - go vet ./metrics.go
-  - go vet ./events.go
-  - go vet ./tools/sa-bench
   - golint . | xargs -r false
   - pip install --user ansible
   - mkdir ${TRAVIS_BUILD_DIR}/qpid-proton-build
