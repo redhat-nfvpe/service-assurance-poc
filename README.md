@@ -1,5 +1,13 @@
 [![Build Status](https://travis-ci.org/redhat-nfvpe/service-assurance-poc.svg?branch=master)](https://travis-ci.org/redhat-nfvpe/service-assurance-poc) [![Go Report Card](https://goreportcard.com/badge/github.com/redhat-nfvpe/service-assurance-poc)](https://goreportcard.com/report/github.com/redhat-nfvpe/service-assurance-poc)
 
+# REPO CONTENTS HAVE MOVED
+
+The contents of the metrics and events consumers (aka listeners) have moved to 
+[redhat-nfvpe/telemetry-consumers](https://github.com/redhat-nfvpe/telemetry-consumers).
+
+No pull requests should be merged into this repository, as they will be lost, and not built
+in future container images. You have been warned!
+
 ## Note about development
 - go to https://github.com/redhat-nfvpe/service-assurance-poc and fork it to
   your account
